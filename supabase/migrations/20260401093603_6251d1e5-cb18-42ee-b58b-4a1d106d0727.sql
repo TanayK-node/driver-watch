@@ -1,0 +1,1 @@
+CREATE POLICY "Allow public read access to drivers" ON public.drivers FOR SELECT USING (true);
