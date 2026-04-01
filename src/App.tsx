@@ -3,8 +3,13 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import DriverOverview from "./pages/DriverOverview";
+import DriverDetail from "./pages/DriverDetail";
+import AttendanceDashboard from "./pages/AttendanceDashboard";
+import RouteAdherence from "./pages/RouteAdherence";
+import TripAnalytics from "./pages/TripAnalytics";
+import LiveMap from "./pages/LiveMap";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -15,8 +20,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/" element={<DriverOverview />} />
+          <Route path="/driver/:id" element={<DriverDetail />} />
+          <Route path="/attendance" element={<AttendanceDashboard />} />
+          <Route path="/routes" element={<RouteAdherence />} />
+          <Route path="/trips" element={<TripAnalytics />} />
+          <Route path="/map" element={<LiveMap />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
