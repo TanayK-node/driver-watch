@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface RawRow {
@@ -31,12 +31,28 @@ interface MappedRow extends RawRow {
 
 type Step = "upload" | "map" | "review";
 
+/** Convert various date formats (DD-MM-YYYY, DD/MM/YYYY, etc.) to YYYY-MM-DD */
+function normalizeDate(raw: string): string {
+  const trimmed = raw.trim();
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  // DD-MM-YYYY or DD/MM/YYYY
+  const match = trimmed.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (match) {
+    const [, day, month, year] = match;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  // MM/DD/YYYY — fallback (ambiguous, but try)
+  return trimmed;
+}
+
 export default function AttendanceUpload() {
   const [step, setStep] = useState<Step>("upload");
   const [pasteData, setPasteData] = useState("");
   const [rawRows, setRawRows] = useState<RawRow[]>([]);
   const [mappedRows, setMappedRows] = useState<MappedRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["drivers-list"],
@@ -54,7 +70,12 @@ export default function AttendanceUpload() {
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(/[,\t]/).map((c) => c.trim().replace(/^"|"$/g, ""));
       if (cols.length >= 4) {
-        rows.push({ rawName: cols[0], date: cols[1], inTime: cols[2], outTime: cols[3] });
+        rows.push({
+          rawName: cols[0],
+          date: normalizeDate(cols[1]),
+          inTime: cols[2],
+          outTime: cols[3],
+        });
       }
     }
     return rows;
@@ -87,6 +108,58 @@ export default function AttendanceUpload() {
     toast.success(`Parsed ${rows.length} rows`);
   };
 
+  /** AI-powered photo extraction */
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file (JPG, PNG, etc.)");
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      // Convert to base64
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
+      const { data, error } = await supabase.functions.invoke("extract-attendance", {
+        body: {
+          imageBase64: base64,
+          drivers: drivers.map((d) => ({ driverId: d.driverId, name: d.name })),
+        },
+      });
+
+      if (error) throw error;
+
+      const rows: RawRow[] = (data?.rows || []).map((r: any) => ({
+        rawName: r.rawName || "",
+        date: normalizeDate(r.date || ""),
+        inTime: r.inTime || "",
+        outTime: r.outTime || "",
+      }));
+
+      if (rows.length === 0) {
+        toast.error("AI could not extract any attendance records from the image");
+        return;
+      }
+
+      setRawRows(rows);
+      toast.success(`AI extracted ${rows.length} records from photo`);
+    } catch (err: any) {
+      console.error("AI extraction error:", err);
+      toast.error(err.message || "Failed to extract data from photo");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const autoMatch = useCallback(() => {
     const mapped: MappedRow[] = rawRows.map((row) => {
       const normalRaw = row.rawName.toLowerCase().trim();
@@ -94,7 +167,6 @@ export default function AttendanceUpload() {
       if (exact) {
         return { ...row, driverId: exact.driverId, driverName: exact.name, matchStatus: "auto" as const };
       }
-      // partial match
       const partial = drivers.find(
         (d) =>
           d.name?.toLowerCase().includes(normalRaw) ||
@@ -180,6 +252,35 @@ export default function AttendanceUpload() {
         {/* STEP 1: Upload */}
         {step === "upload" && (
           <div className="grid gap-6 md:grid-cols-2">
+            {/* AI Photo Upload */}
+            <Card className="md:col-span-2 border-primary/30 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Camera className="h-4 w-4" /> 📸 Upload Gate Register Photo (AI-powered)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Upload a photo of your handwritten gate register. AI will extract driver names, dates, and times automatically.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="cursor-pointer max-w-sm"
+                    disabled={aiLoading}
+                  />
+                  {aiLoading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      AI is reading the register...
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
