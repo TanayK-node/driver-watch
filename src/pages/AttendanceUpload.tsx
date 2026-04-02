@@ -201,8 +201,18 @@ export default function AttendanceUpload() {
       toast.error("No mapped records to save");
       return;
     }
+
+    // Keep only one row per driver+date in the current batch to avoid self-conflicting upserts.
+    const dedupedByDriverDate = new Map<string, MappedRow>();
+    for (const row of valid) {
+      const key = `${row.driverId}|${row.date}`;
+      dedupedByDriverDate.set(key, row);
+    }
+    const dedupedRows = Array.from(dedupedByDriverDate.values());
+    const skippedDuplicates = valid.length - dedupedRows.length;
+
     setSaving(true);
-    const records = valid.map((r) => ({
+    const records = dedupedRows.map((r) => ({
       driver_id: r.driverId!,
       raw_name: r.rawName,
       date: r.date,
@@ -211,17 +221,23 @@ export default function AttendanceUpload() {
       source: "manual",
     }));
 
-    const { error } = await supabase.from("attendance").insert(records);
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(records, { onConflict: "driver_id,date" });
     setSaving(false);
     if (error) {
-      if (error.code === "23505") {
-        toast.error("Duplicate entries found for some driver+date combinations");
-      } else {
-        toast.error(error.message);
-      }
+      toast.error(error.message);
       return;
     }
-    toast.success(`Saved ${valid.length} attendance records`);
+
+    if (skippedDuplicates > 0) {
+      toast.success(
+        `Saved ${dedupedRows.length} records. ${skippedDuplicates} duplicate row(s) in this upload were merged by driver+date.`
+      );
+    } else {
+      toast.success(`Saved ${dedupedRows.length} attendance records`);
+    }
+
     setStep("upload");
     setRawRows([]);
     setMappedRows([]);

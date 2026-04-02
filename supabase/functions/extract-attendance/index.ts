@@ -19,34 +19,47 @@ serve(async (req) => {
 
     if (!imageBase64) throw new Error("imageBase64 is required");
 
-    const driverList = (drivers || [])
-      .map((d: { driverId: string; name: string }) => `${d.name} (${d.driverId})`)
-      .join("\n");
+    const uniqueDriverNames = Array.from(
+      new Set(
+        (drivers || [])
+          .map((d: { driverId: string; name: string }) => (d.name || "").trim())
+          .filter(Boolean)
+      )
+    );
 
-    const systemPrompt = `You are an attendance data extractor. You will receive a photo of a gate register or attendance sheet.
+    const driverList = uniqueDriverNames.join("\n");
+    const today = new Date().toISOString().slice(0, 10);
 
-Extract each row into this exact JSON format:
+    const systemPrompt = `You are an attendance data extractor. This is attendance data from a gate register image.
+
+Assume date = ${today} if a row has no visible date.
+
+Give records in this exact structure and return ONLY JSON:
 {
   "rows": [
     {
-      "rawName": "Name as written in register",
+      "rawName": "Driver Name",
       "date": "YYYY-MM-DD",
-      "inTime": "HH:MM (24hr)",
-      "outTime": "HH:MM (24hr) or empty string if not present"
+      "inTime": "HH:MM",
+      "outTime": "HH:MM or empty string"
     }
   ]
 }
 
-Here is the list of known drivers to help with name matching:
+This is the list of driver names. This list is VERY IMPORTANT.
+Use ONLY these names in rawName (exact spelling from the list):
 ${driverList}
 
 Rules:
-- Convert all dates to YYYY-MM-DD format
-- Convert all times to 24-hour HH:MM format
-- If a name is hard to read, make your best guess
-- If out time is missing, use empty string ""
-- Return ONLY valid JSON, no markdown or explanation
-- If you cannot read the image or find no attendance data, return {"rows": []}`;
+- Extract all attendance rows visible in the image.
+- rawName must be exactly one name from the list above. Do not invent or alter names.
+- If a handwritten name is unclear, choose the closest valid name from the list.
+- Convert all dates to YYYY-MM-DD format.
+- If date is missing on a row, use ${today}.
+- Convert all times to 24-hour HH:MM format.
+- If out time is missing, set outTime to empty string "".
+- Return ONLY valid JSON. No markdown, no explanation, no extra keys.
+- If no attendance rows are readable, return {"rows": []}.`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -69,7 +82,7 @@ Rules:
                 },
                 {
                   type: "text",
-                  text: "Extract all attendance records from this gate register image.",
+                  text: "Extract attendance and map each driver to ONLY the provided driver list names.",
                 },
               ],
             },
