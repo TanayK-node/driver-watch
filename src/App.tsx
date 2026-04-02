@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import DriverOverview from "./pages/DriverOverview";
 import DriverDetail from "./pages/DriverDetail";
 import AttendanceDashboard from "./pages/AttendanceDashboard";
+import AttendanceUpload from "./pages/AttendanceUpload";
+import DriverAttendanceDetail from "./pages/DriverAttendanceDetail";
 import RouteAdherence from "./pages/RouteAdherence";
 import TripAnalytics from "./pages/TripAnalytics";
 import LiveMap from "./pages/LiveMap";
@@ -23,6 +25,8 @@ const App = () => (
           <Route path="/" element={<DriverOverview />} />
           <Route path="/driver/:id" element={<DriverDetail />} />
           <Route path="/attendance" element={<AttendanceDashboard />} />
+          <Route path="/attendance/upload" element={<AttendanceUpload />} />
+          <Route path="/attendance/driver/:driverId" element={<DriverAttendanceDetail />} />
           <Route path="/routes" element={<RouteAdherence />} />
           <Route path="/trips" element={<TripAnalytics />} />
           <Route path="/map" element={<LiveMap />} />
