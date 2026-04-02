@@ -1,4 +1,4 @@
-import { Users, ClipboardCheck, Route, BarChart3, Map } from "lucide-react";
+import { Users, ClipboardCheck, Upload, Route, BarChart3, Map } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
