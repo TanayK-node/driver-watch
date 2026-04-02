@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          created_at: string | null
+          date: string | null
+          driver_id: string | null
+          id: number
+          source: string | null
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string | null
+          driver_id?: string | null
+          id?: number
+          source?: string | null
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string | null
+          driver_id?: string | null
+          id?: number
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["driverId"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           created_at: string | null
