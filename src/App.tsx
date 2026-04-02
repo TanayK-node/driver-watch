@@ -23,6 +23,8 @@ const App = () => (
           <Route path="/" element={<DriverOverview />} />
           <Route path="/driver/:id" element={<DriverDetail />} />
           <Route path="/attendance" element={<AttendanceDashboard />} />
+          <Route path="/attendance/upload" element={<AttendanceUpload />} />
+          <Route path="/attendance/driver/:driverId" element={<DriverAttendanceDetail />} />
           <Route path="/routes" element={<RouteAdherence />} />
           <Route path="/trips" element={<TripAnalytics />} />
           <Route path="/map" element={<LiveMap />} />

@@ -16,6 +16,7 @@ import {
 const items = [
   { title: "Drivers", url: "/", icon: Users },
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
+  { title: "Upload Attendance", url: "/attendance/upload", icon: Upload },
   { title: "Route Adherence", url: "/routes", icon: Route },
   { title: "Trip Analytics", url: "/trips", icon: BarChart3 },
   { title: "Live Map", url: "/map", icon: Map },
