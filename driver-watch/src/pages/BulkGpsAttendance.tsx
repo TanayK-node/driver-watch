@@ -205,7 +205,6 @@ export default function BulkGpsAttendance() {
             </CardContent>
           </Card>
         )}
-      </div>
-      </div>
+    </div>
   );
 }
