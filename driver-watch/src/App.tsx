@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import LandingPage from "./pages/LandingPage";
 import DriverOverview from "./pages/DriverOverview";
 import DriverDetail from "./pages/DriverDetail";
 import AttendanceDashboard from "./pages/AttendanceDashboard";
@@ -23,7 +24,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<DriverOverview />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/drivers" element={<DriverOverview />} />
           <Route path="/driver/:id" element={<DriverDetail />} />
           <Route path="/attendance" element={<AttendanceDashboard />} />
           <Route path="/attendance/upload" element={<AttendanceUpload />} />

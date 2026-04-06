@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Users, UserCheck, UserX, CalendarIcon, AlertTriangle } from "lucide-react";
+import { Users, UserCheck, UserX, CalendarIcon, AlertTriangle, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -137,10 +137,31 @@ export default function AttendanceDashboard() {
     return {
       manualMins,
       gpsMins,
+      status,
       statusLabel,
       statusVariant,
     };
   };
+
+  const manualPresentIds = new Set(
+    attendance
+      .filter((a) => Boolean(a.check_in) || Boolean(a.check_out))
+      .map((a) => a.driver_id)
+  );
+  const gpsPresentIds = new Set(
+    attendance
+      .filter((a) => Boolean(a.gps_first_in) || Boolean(a.gps_last_out) || Boolean(a.gps_total_hours))
+      .map((a) => a.driver_id)
+  );
+
+  const manualPresentCount = manualPresentIds.size;
+  const manualAbsentCount = Math.max(0, drivers.length - manualPresentCount);
+  const gpsPresentCount = gpsPresentIds.size;
+  const gpsAbsentCount = Math.max(0, drivers.length - gpsPresentCount);
+
+  const analyzedAttendance = attendance.map((a) => analyzeRecord(a));
+  const verifiedTripsCount = analyzedAttendance.filter((a) => a.status === "matched").length;
+  const mismatchedTripsCount = analyzedAttendance.filter((a) => a.status === "mismatch").length;
 
   return (
     <DashboardLayout title="Attendance Dashboard">
@@ -185,17 +206,29 @@ export default function AttendanceDashboard() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <KPICard title="Total Drivers" value={drivers.length} icon={Users} />
-          <KPICard title="Present Today" value={presentCount} icon={UserCheck} accent="success" />
-          <KPICard title="Absent Today" value={absentCount} icon={UserX} accent="destructive" />
-          {/* Optional new KPI to track discrepancies */}
-          <KPICard 
-            title="Mismatches" 
-            value={attendance.filter(a => analyzeRecord(a).statusVariant === "destructive").length} 
-            icon={AlertTriangle} 
-            accent="destructive" 
+          <KPICard
+            title="Present"
+            value={presentCount}
+            subtitle={`Manual: ${manualPresentCount} | GPS: ${gpsPresentCount}`}
+            icon={UserCheck}
+            accent="success"
           />
+          <KPICard
+            title="Absent"
+            value={absentCount}
+            subtitle={`Manual: ${manualAbsentCount} | GPS: ${gpsAbsentCount}`}
+            icon={UserX}
+            accent="destructive"
+          />
+          <KPICard
+            title="Verified Attendance"
+            value={verifiedTripsCount}
+            icon={ShieldCheck}
+            accent="success"
+          />
+          <KPICard title="Mismatched Attendance" value={mismatchedTripsCount} icon={AlertTriangle} accent="destructive" />
         </div>
 
         {/* Table */}

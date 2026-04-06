@@ -3,7 +3,7 @@ import os
 import io
 import pandas as pd
 import geopandas as gpd
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -44,7 +44,6 @@ except Exception as e:
 
 @app.post("/api/attendance/verify-gps-bulk")
 async def verify_gps_attendance_bulk(
-    date: str = Form(...),
     file: UploadFile = File(...)
 ):
     if campus_boundary is None:
@@ -58,13 +57,13 @@ async def verify_gps_attendance_bulk(
         if not all(col in df.columns for col in required_cols):
             raise HTTPException(status_code=400, detail="Missing required CSV columns.")
             
-        # 1. Filter the entire file by the target date
-        df['timestamp'] = pd.to_datetime(df['timestamp'], format='mixed')
-        target_date = pd.to_datetime(date).date()
-        df = df[df['timestamp'].dt.date == target_date]
-        
+        # 1. Parse timestamps and derive attendance date directly from CSV.
+        df['timestamp'] = pd.to_datetime(df['timestamp'], format='mixed', errors='coerce', utc=True)
+        df = df.dropna(subset=['timestamp'])
+        df['attendance_date'] = df['timestamp'].dt.date
+
         if df.empty:
-            return {"status": "success", "data": [], "message": f"No records found for {date}."}
+            return {"status": "success", "data": [], "message": "No valid timestamp records found in CSV."}
 
         # 2. Geospatial Filter: Keep only points inside IIT
         gdf = gpd.GeoDataFrame(
@@ -112,9 +111,10 @@ async def verify_gps_attendance_bulk(
                         return parsed.min(), parsed.max()
             return group['timestamp'].min(), group['timestamp'].max()
         
-        # Group the data by driverId
-        for driver_id, group in points_inside.groupby('driverId'):
+        # Group by driverId and inferred date so multi-day CSVs are handled correctly.
+        for (driver_id, attendance_date), group in points_inside.groupby(['driverId', 'attendance_date']):
             driver_id_str = str(driver_id)
+            attendance_date_str = attendance_date.isoformat()
             first_in, last_out = resolve_group_time(
                 group,
                 ["ist_time", "first_time", "in_time", "entry_time", "time"]
@@ -133,6 +133,7 @@ async def verify_gps_attendance_bulk(
             attendance_results.append({
                 "driver_id": driver_id_str, # Included so frontend still has the ID reference
                 "driver_name": driver_name_map.get(driver_id_str, "Unknown Driver"),
+                "date": attendance_date_str,
                 "first_in": first_in_formatted,
                 "last_out": last_out_formatted,
                 "total_hours": round(duration_hours, 2),
@@ -153,7 +154,7 @@ async def verify_gps_attendance_bulk(
                 supabase_payload.append({
                     "driver_id": driver_id_str,
                     "raw_name": driver_name_map.get(driver_id_str, "Unknown Driver"),
-                    "date": date,
+                    "date": attendance_date_str,
                     "gps_first_in": gps_first_in_time.strftime("%H:%M"),
                     "gps_last_out": gps_last_out_time.strftime("%H:%M"),
                     "gps_total_hours": round(duration_hours, 2)
@@ -172,9 +173,10 @@ async def verify_gps_attendance_bulk(
                 print(f"Warning: Failed to save to Supabase: {str(e)}")
 
         # 6. Return the complete list to the frontend
+        processed_dates = sorted({record["date"] for record in attendance_results})
         return {
             "status": "success",
-            "date": date,
+            "dates": processed_dates,
             "total_drivers_processed": len(attendance_results),
             "saved_to_attendance": len(supabase_payload),
             "skipped_missing_drivers": len(skipped_driver_ids),

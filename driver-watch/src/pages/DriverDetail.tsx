@@ -41,7 +41,7 @@ export default function DriverDetail() {
       <DashboardLayout title="Driver Not Found">
         <div className="text-center py-12">
           <p className="text-muted-foreground">Driver not found.</p>
-          <Button variant="outline" className="mt-4" onClick={() => navigate("/")}>Back</Button>
+          <Button variant="outline" className="mt-4" onClick={() => navigate("/drivers")}>Back</Button>
         </div>
       </DashboardLayout>
     );
@@ -50,7 +50,7 @@ export default function DriverDetail() {
   return (
     <DashboardLayout title={driver.name || "Driver"}>
       <div className="space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/drivers")} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Drivers
         </Button>
 

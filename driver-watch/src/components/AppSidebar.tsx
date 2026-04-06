@@ -1,4 +1,4 @@
-import { Users, ClipboardCheck, Upload, Route, BarChart3, Map } from "lucide-react";
+import { Home, Users, ClipboardCheck, Upload, Route, BarChart3, Map } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Drivers", url: "/", icon: Users },
+  { title: "Home", url: "/", icon: Home },
+  { title: "Drivers", url: "/drivers", icon: Users },
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
   { title: "Upload Attendance", url: "/attendance/upload", icon: Upload },
   { title: "Route Adherence", url: "/routes", icon: Route },
