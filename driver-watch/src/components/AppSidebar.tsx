@@ -34,10 +34,10 @@ export function AppSidebar() {
         <div className="px-4 py-5">
           {!collapsed && (
             <h2 className="text-lg font-bold text-sidebar-primary-foreground tracking-tight">
-              🚐 Driver Dashboard
+              Driver db
             </h2>
           )}
-          {collapsed && <span className="text-xl">🚐</span>}
+          {collapsed && <span className="text-xl">🚗</span>}
         </div>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
