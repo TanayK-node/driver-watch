@@ -11,6 +11,7 @@ import DriverAttendanceDetail from "./pages/DriverAttendanceDetail";
 import RouteAdherence from "./pages/RouteAdherence";
 import TripAnalytics from "./pages/TripAnalytics";
 import LiveMap from "./pages/LiveMap";
+import BulkGpsAttendance from "./pages/BulkGpsAttendance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/routes" element={<RouteAdherence />} />
           <Route path="/trips" element={<TripAnalytics />} />
           <Route path="/map" element={<LiveMap />} />
+          <Route path="/gps-attendance" element={<BulkGpsAttendance />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
