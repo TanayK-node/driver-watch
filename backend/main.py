@@ -24,7 +24,11 @@ app = FastAPI(title="Driver Attendance GPS Backend")
 # Setup CORS for the React Frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000","http://localhost:8080"], # Update with your frontend URL
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://localhost:3000",
+        "http://localhost:8080"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,7 +42,6 @@ except Exception as e:
     print(f"Warning: Could not load boundary file. Make sure {BOUNDARY_FILE_PATH} exists.")
     campus_boundary = None
 
-@app.post("/api/attendance/verify-gps")
 @app.post("/api/attendance/verify-gps-bulk")
 async def verify_gps_attendance_bulk(
     date: str = Form(...),
@@ -75,8 +78,10 @@ async def verify_gps_attendance_bulk(
         if points_inside.empty:
             return {"status": "success", "data": [], "message": "No points inside campus."}
 
+        # 3. Fetch Driver Names from Supabase
         unique_driver_ids = [str(driver_id) for driver_id in points_inside['driverId'].dropna().unique().tolist()]
         driver_name_map = {}
+        valid_driver_ids = set()
 
         if unique_driver_ids:
             drivers_result = (
@@ -89,12 +94,15 @@ async def verify_gps_attendance_bulk(
 
             for driver in drivers_result.data or []:
                 db_driver_id = str(driver.get("driverId"))
+                valid_driver_ids.add(db_driver_id)
                 db_driver_name = (driver.get("name") or "").strip()
                 if db_driver_name:
                     driver_name_map[db_driver_id] = db_driver_name
 
-        # 3. Bulk Grouping: Calculate In/Out for EVERY driver instantly
+        # 4. Bulk Grouping: Calculate In/Out for EVERY driver instantly
         attendance_results = []
+        supabase_payload = []
+        skipped_driver_ids = []
         
         # Group the data by driverId
         for driver_id, group in points_inside.groupby('driverId'):
@@ -103,19 +111,51 @@ async def verify_gps_attendance_bulk(
             last_out = group['timestamp'].max()
             duration_hours = (last_out - first_in).total_seconds() / 3600
             
+            # Format times for the frontend array
+            first_in_formatted = first_in.strftime("%I:%M %p")
+            last_out_formatted = last_out.strftime("%I:%M %p")
+            
             attendance_results.append({
+                "driver_id": driver_id_str, # Included so frontend still has the ID reference
                 "driver_name": driver_name_map.get(driver_id_str, "Unknown Driver"),
-                "first_in": first_in.strftime("%I:%M %p"), # Formats to e.g., 08:30 AM
-                "last_out": last_out.strftime("%I:%M %p"),
+                "first_in": first_in_formatted,
+                "last_out": last_out_formatted,
                 "total_hours": round(duration_hours, 2),
                 "status": "Present (GPS)"
             })
 
-        # 4. Return the complete list to the frontend
+            # Prepare the raw data for Supabase Upsert
+            if driver_id_str in valid_driver_ids:
+                supabase_payload.append({
+                    "driver_id": driver_id_str,
+                    "raw_name": driver_name_map.get(driver_id_str, "Unknown Driver"),
+                    "date": date,
+                    "gps_first_in": first_in.strftime("%H:%M"),
+                    "gps_last_out": last_out.strftime("%H:%M"),
+                    "gps_total_hours": round(duration_hours, 2),
+                    "source": "gps"
+                })
+            else:
+                skipped_driver_ids.append(driver_id_str)
+
+        # 5. Push GPS Data to Supabase (Upsert)
+        if supabase_payload:
+            try:
+                supabase.table('attendance').upsert(
+                    supabase_payload, 
+                    on_conflict='driver_id,date'
+                ).execute()
+            except Exception as e:
+                print(f"Warning: Failed to save to Supabase: {str(e)}")
+
+        # 6. Return the complete list to the frontend
         return {
             "status": "success",
             "date": date,
             "total_drivers_processed": len(attendance_results),
+            "saved_to_attendance": len(supabase_payload),
+            "skipped_missing_drivers": len(skipped_driver_ids),
+            "skipped_driver_ids": skipped_driver_ids,
             "data": attendance_results
         }
 

@@ -40,7 +40,13 @@ export default function DriverAttendanceDetail() {
     enabled: !!driverId,
   });
 
-  const calcMinutes = (checkIn: string | null, checkOut: string | null) => {
+  const getDisplayCheckIn = (record: any) => record.check_in ?? record.gps_first_in ?? null;
+
+  const getDisplayCheckOut = (record: any) => record.check_out ?? record.gps_last_out ?? null;
+
+  const calcMinutes = (record: any) => {
+    const checkIn = getDisplayCheckIn(record);
+    const checkOut = getDisplayCheckOut(record);
     if (!checkIn || !checkOut) return 0;
     const [h1, m1] = checkIn.split(":").map(Number);
     const [h2, m2] = checkOut.split(":").map(Number);
@@ -54,7 +60,7 @@ export default function DriverAttendanceDetail() {
   };
 
   const totalDays = records.length;
-  const totalMinutes = records.reduce((sum, r) => sum + calcMinutes(r.check_in, r.check_out), 0);
+  const totalMinutes = records.reduce((sum, r) => sum + calcMinutes(r), 0);
   const avgHours = totalDays > 0 ? formatHours(Math.round(totalMinutes / totalDays)) : "—";
 
   return (
@@ -89,9 +95,9 @@ export default function DriverAttendanceDetail() {
                   {records.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.date}</TableCell>
-                      <TableCell>{r.check_in ?? "—"}</TableCell>
-                      <TableCell>{r.check_out ?? <span className="text-warning">Missing</span>}</TableCell>
-                      <TableCell>{formatHours(calcMinutes(r.check_in, r.check_out))}</TableCell>
+                      <TableCell>{getDisplayCheckIn(r) ?? "—"}</TableCell>
+                      <TableCell>{getDisplayCheckOut(r) ?? <span className="text-warning">Missing</span>}</TableCell>
+                      <TableCell>{formatHours(calcMinutes(r))}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

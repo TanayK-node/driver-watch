@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { DashboardLayout } from "@/components/DashboardLayout";
 
 interface GpsRecord {
   driver_name: string;
@@ -81,6 +82,7 @@ export default function BulkGpsAttendance() {
   };
 
   return (
+    <DashboardLayout title="Bulk GPS Attendance">
       <div className="space-y-6">
         <div>
           <p className="text-muted-foreground text-sm">Upload a GPS CSV file to verify driver attendance by location.</p>
@@ -206,6 +208,6 @@ export default function BulkGpsAttendance() {
           </Card>
         )}
       </div>
-      </div>
+    </DashboardLayout>
   );
 }

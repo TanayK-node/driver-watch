@@ -55,7 +55,13 @@ export default function AttendanceDashboard() {
   const presentCount = presentIds.size;
   const absentCount = drivers.length - presentCount;
 
-  const calcHours = (checkIn: string | null, checkOut: string | null) => {
+  const getDisplayCheckIn = (record: any) => record.check_in ?? record.gps_first_in ?? null;
+
+  const getDisplayCheckOut = (record: any) => record.check_out ?? record.gps_last_out ?? null;
+
+  const calcHours = (record: any) => {
+    const checkIn = getDisplayCheckIn(record);
+    const checkOut = getDisplayCheckOut(record);
     if (!checkIn || !checkOut) return "—";
     const [h1, m1] = checkIn.split(":").map(Number);
     const [h2, m2] = checkOut.split(":").map(Number);
@@ -154,9 +160,9 @@ export default function AttendanceDashboard() {
                       <TableCell>
                         <StatusBadge status={a.source === "gps" ? "gps" : "manual"} />
                       </TableCell>
-                      <TableCell>{a.check_in ?? "—"}</TableCell>
-                      <TableCell>{a.check_out ?? <span className="text-warning">Missing</span>}</TableCell>
-                      <TableCell>{calcHours(a.check_in, a.check_out)}</TableCell>
+                      <TableCell>{getDisplayCheckIn(a) ?? "—"}</TableCell>
+                      <TableCell>{getDisplayCheckOut(a) ?? <span className="text-warning">Missing</span>}</TableCell>
+                      <TableCell>{calcHours(a)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
