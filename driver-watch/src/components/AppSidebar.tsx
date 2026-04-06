@@ -20,7 +20,6 @@ const items = [
   { title: "Route Adherence", url: "/routes", icon: Route },
   { title: "Trip Analytics", url: "/trips", icon: BarChart3 },
   { title: "Live Map", url: "/map", icon: Map },
-  { title: "GPS Attendance", url: "/gps-attendance", icon: MapPin },
 ];
 
 export function AppSidebar() {
