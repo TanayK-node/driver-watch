@@ -206,7 +206,7 @@ export default function AttendanceDashboard() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard title="Total Drivers" value={drivers.length} icon={Users} />
           <KPICard
             title="Present"
@@ -222,12 +222,12 @@ export default function AttendanceDashboard() {
             icon={UserX}
             accent="destructive"
           />
-          <KPICard
+          {/* <KPICard
             title="Verified Attendance"
             value={verifiedTripsCount}
             icon={ShieldCheck}
             accent="success"
-          />
+          /> */}
           <KPICard title="Mismatched Attendance" value={mismatchedTripsCount} icon={AlertTriangle} accent="destructive" />
         </div>
 

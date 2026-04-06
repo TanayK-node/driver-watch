@@ -44,7 +44,7 @@ export default function LandingPage() {
 
   return (
     <DashboardLayout title="Operational Intelligence">
-      <div className="relative mx-auto max-w-7xl space-y-8 overflow-hidden">
+      <div className="relative mx-auto max-w-7xl space-y-4 overflow-hidden">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <div className="landing-orb landing-orb-one animate-aurora" />
           <div className="landing-orb landing-orb-two animate-aurora-delayed" />
@@ -62,7 +62,7 @@ export default function LandingPage() {
 
               <div className="space-y-4">
                 <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl lg:text-6xl animate-fade-up" style={{ animationDelay: "80ms" }}>
-                  Driver monitoring that turns raw movement data into clear operational action.
+                  Driver monitoring Dashboard
                 </h1>
                 <p className="max-w-2xl text-sm leading-7 text-muted-foreground md:text-base animate-fade-up" style={{ animationDelay: "140ms" }}>
                   The Driver Monitoring and Operational Intelligence Dashboard helps teams evaluate attendance, GPS traces,
@@ -149,7 +149,13 @@ export default function LandingPage() {
           </Card>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Features</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Core capabilities built for day-to-day fleet operations.</h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {features.map((feature, index) => {
             const Icon = feature.icon;
 
@@ -169,13 +175,14 @@ export default function LandingPage() {
               </Card>
             );
           })}
+          </div>
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
           <Card className="border-border/60 bg-card/85 shadow-sm backdrop-blur-sm animate-fade-up" style={{ animationDelay: "180ms" }}>
             <CardHeader>
               <CardDescription>Why it matters</CardDescription>
-              <CardTitle className="text-xl">Replace repetitive inspection with a faster review loop.</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl">Replace repetitive inspection with a faster review loop.</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
               <p>
@@ -192,7 +199,7 @@ export default function LandingPage() {
           <Card className="border-border/60 bg-card/85 shadow-sm backdrop-blur-sm animate-fade-up" style={{ animationDelay: "220ms" }}>
             <CardHeader>
               <CardDescription>How it flows</CardDescription>
-              <CardTitle className="text-xl">A simple path from upload to decision.</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl">A simple path from upload to decision.</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-3">
               {workflow.map((item, index) => (
