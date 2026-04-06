@@ -247,9 +247,27 @@ export default function AttendanceUpload() {
   };
 
   return (
-    <DashboardLayout title="Upload Attendance">
+    <DashboardLayout title="Attendance Uploads">
       <div className="space-y-6 max-w-5xl">
-        {/* Step indicators */}
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Attendance Uploads</h1>
+          <p className="text-muted-foreground text-sm">Upload and process driver attendance records.</p>
+        </div>
+
+        <Tabs defaultValue="manual" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="manual" className="gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Manual Upload
+            </TabsTrigger>
+            <TabsTrigger value="gps" className="gap-2">
+              <MapPin className="h-4 w-4" />
+              GPS Upload
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="manual" className="mt-6">
+            <div className="space-y-6">
         <div className="flex gap-2">
           {(["upload", "map", "review"] as Step[]).map((s, i) => (
             <Badge
