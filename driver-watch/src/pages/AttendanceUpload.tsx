@@ -530,6 +530,13 @@ export default function AttendanceUpload() {
             </CardContent>
           </Card>
         )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="gps" className="mt-6">
+            <BulkGpsAttendance />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
