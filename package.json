@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "cd driver-watch && npx --no-install vite",
     "build": "cd driver-watch && npx --no-install vite build",
+    "build:dev": "cd driver-watch && npx --no-install vite build",
     "postinstall": "cd driver-watch && npm install"
   }
 }
