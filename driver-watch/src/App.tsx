@@ -11,6 +11,7 @@ import DriverAttendanceDetail from "./pages/DriverAttendanceDetail";
 import RouteAdherence from "./pages/RouteAdherence";
 import TripAnalytics from "./pages/TripAnalytics";
 import LiveMap from "./pages/LiveMap";
+import BulkGpsAttendance from "./pages/BulkGpsAttendance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
