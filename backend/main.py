@@ -103,12 +103,27 @@ async def verify_gps_attendance_bulk(
         attendance_results = []
         supabase_payload = []
         skipped_driver_ids = []
+
+        def resolve_group_time(group: pd.DataFrame, candidate_columns: list[str]) -> tuple[pd.Timestamp, pd.Timestamp]:
+            for column_name in candidate_columns:
+                if column_name in group.columns:
+                    parsed = pd.to_datetime(group[column_name], format='mixed', errors='coerce').dropna()
+                    if not parsed.empty:
+                        return parsed.min(), parsed.max()
+            return group['timestamp'].min(), group['timestamp'].max()
         
         # Group the data by driverId
         for driver_id, group in points_inside.groupby('driverId'):
             driver_id_str = str(driver_id)
-            first_in = group['timestamp'].min()
-            last_out = group['timestamp'].max()
+            first_in, last_out = resolve_group_time(
+                group,
+                ["ist_time", "first_time", "in_time", "entry_time", "time"]
+            )
+
+            if pd.isna(first_in) or pd.isna(last_out):
+                first_in = group['timestamp'].min()
+                last_out = group['timestamp'].max()
+
             duration_hours = (last_out - first_in).total_seconds() / 3600
             
             # Format times for the frontend array
@@ -126,14 +141,22 @@ async def verify_gps_attendance_bulk(
 
             # Prepare the raw data for Supabase Upsert
             if driver_id_str in valid_driver_ids:
+                gps_first_in_time, gps_last_out_time = resolve_group_time(
+                    group,
+                    ["ist_time", "first_time", "in_time", "entry_time", "time", "last_time", "out_time", "exit_time"]
+                )
+
+                if pd.isna(gps_first_in_time) or pd.isna(gps_last_out_time):
+                    gps_first_in_time = first_in
+                    gps_last_out_time = last_out
+
                 supabase_payload.append({
                     "driver_id": driver_id_str,
                     "raw_name": driver_name_map.get(driver_id_str, "Unknown Driver"),
                     "date": date,
-                    "gps_first_in": first_in.strftime("%H:%M"),
-                    "gps_last_out": last_out.strftime("%H:%M"),
-                    "gps_total_hours": round(duration_hours, 2),
-                    "source": "gps"
+                    "gps_first_in": gps_first_in_time.strftime("%H:%M"),
+                    "gps_last_out": gps_last_out_time.strftime("%H:%M"),
+                    "gps_total_hours": round(duration_hours, 2)
                 })
             else:
                 skipped_driver_ids.append(driver_id_str)

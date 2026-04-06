@@ -40,17 +40,12 @@ export default function DriverAttendanceDetail() {
     enabled: !!driverId,
   });
 
-  const getDisplayCheckIn = (record: any) => record.check_in ?? record.gps_first_in ?? null;
-
-  const getDisplayCheckOut = (record: any) => record.check_out ?? record.gps_last_out ?? null;
-
-  const calcMinutes = (record: any) => {
-    const checkIn = getDisplayCheckIn(record);
-    const checkOut = getDisplayCheckOut(record);
+  const calcMinutes = (checkIn: string | null, checkOut: string | null) => {
     if (!checkIn || !checkOut) return 0;
     const [h1, m1] = checkIn.split(":").map(Number);
     const [h2, m2] = checkOut.split(":").map(Number);
-    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    if (diff < 0) diff += 24 * 60;
     return diff > 0 ? diff : 0;
   };
 
@@ -60,16 +55,26 @@ export default function DriverAttendanceDetail() {
   };
 
   const totalDays = records.length;
-  const totalMinutes = records.reduce((sum, r) => sum + calcMinutes(r), 0);
-  const avgHours = totalDays > 0 ? formatHours(Math.round(totalMinutes / totalDays)) : "—";
+  const totalGateMinutes = records.reduce((sum, r) => sum + calcMinutes(r.check_in, r.check_out), 0);
+  const totalGpsMinutes = records.reduce((sum, r) => {
+    const fromTimes = calcMinutes(r.gps_first_in, r.gps_last_out);
+    if (fromTimes > 0) return sum + fromTimes;
+    const fromHours = r.gps_total_hours ? Math.round(r.gps_total_hours * 60) : 0;
+    return sum + fromHours;
+  }, 0);
+  const avgGateHours = totalDays > 0 ? formatHours(Math.round(totalGateMinutes / totalDays)) : "—";
 
   return (
     <DashboardLayout title={`Attendance — ${driver?.name ?? driverId}`}>
       <div className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KPICard title="Total Days Present" value={totalDays} icon={CalendarDays} accent="success" />
-          <KPICard title="Total Hours Worked" value={formatHours(totalMinutes)} icon={Clock} />
-          <KPICard title="Avg Hours/Day" value={avgHours} icon={UserCheck} accent="warning" />
+          <KPICard title="Total Gate Hours" value={formatHours(totalGateMinutes)} icon={Clock} />
+          <KPICard title="Avg Gate Hrs/Day" value={avgGateHours} icon={UserCheck} accent="warning" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+          <KPICard title="Total GPS Hours" value={formatHours(totalGpsMinutes)} icon={Clock} accent="success" />
         </div>
 
         <Card>
@@ -86,18 +91,24 @@ export default function DriverAttendanceDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
-                    <TableHead>Check-in</TableHead>
-                    <TableHead>Check-out</TableHead>
-                    <TableHead>Hours Worked</TableHead>
+                    <TableHead>Gate In</TableHead>
+                    <TableHead>Gate Out</TableHead>
+                    <TableHead>Gate Hours</TableHead>
+                    <TableHead>GPS In</TableHead>
+                    <TableHead>GPS Out</TableHead>
+                    <TableHead>GPS Hours</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {records.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.date}</TableCell>
-                      <TableCell>{getDisplayCheckIn(r) ?? "—"}</TableCell>
-                      <TableCell>{getDisplayCheckOut(r) ?? <span className="text-warning">Missing</span>}</TableCell>
-                      <TableCell>{formatHours(calcMinutes(r))}</TableCell>
+                      <TableCell>{r.check_in ?? "—"}</TableCell>
+                      <TableCell>{r.check_out ?? <span className="text-warning">Missing</span>}</TableCell>
+                      <TableCell>{formatHours(calcMinutes(r.check_in, r.check_out))}</TableCell>
+                      <TableCell>{r.gps_first_in ?? "—"}</TableCell>
+                      <TableCell>{r.gps_last_out ?? <span className="text-warning">Missing</span>}</TableCell>
+                      <TableCell>{formatHours(calcMinutes(r.gps_first_in, r.gps_last_out) || (r.gps_total_hours ? Math.round(r.gps_total_hours * 60) : 0))}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
