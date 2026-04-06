@@ -1,0 +1,8 @@
+{
+  "name": "driver-watch-root",
+  "private": true,
+  "scripts": {
+    "dev": "cd driver-watch && npm run dev",
+    "build": "cd driver-watch && npm run build"
+  }
+}
