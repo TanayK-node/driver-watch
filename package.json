@@ -2,7 +2,8 @@
   "name": "driver-watch-root",
   "private": true,
   "scripts": {
-    "dev": "cd driver-watch && npx vite",
-    "build": "cd driver-watch && npx vite build"
+    "dev": "npm --prefix driver-watch run dev",
+    "build": "npm --prefix driver-watch run build",
+    "postinstall": "cd driver-watch && npm install"
   }
 }
