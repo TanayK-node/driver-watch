@@ -82,10 +82,8 @@ export default function BulkGpsAttendance() {
   };
 
   return (
-    <DashboardLayout title="Bulk GPS Attendance">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Bulk GPS Attendance</h1>
           <p className="text-muted-foreground text-sm">Upload a GPS CSV file to verify driver attendance by location.</p>
         </div>
 
