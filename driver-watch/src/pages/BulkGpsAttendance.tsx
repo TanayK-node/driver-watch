@@ -9,10 +9,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import DashboardLayout from "@/components/DashboardLayout";
+import { DashboardLayout } from "@/components/DashboardLayout";
 
 interface GpsRecord {
-  driver_id: string;
+  driver_name: string;
   first_in: string;
   last_out: string;
   total_hours: number;
@@ -54,7 +54,16 @@ export default function BulkGpsAttendance() {
         body: formData,
       });
 
-      if (!res.ok) throw new Error("API request failed");
+      if (!res.ok) {
+        let errorMessage = "API request failed";
+        try {
+          const errorBody = await res.json();
+          errorMessage = errorBody?.detail || errorBody?.message || errorMessage;
+        } catch {
+          // Keep fallback message when response is not JSON.
+        }
+        throw new Error(errorMessage);
+      }
 
       const json = await res.json();
       setData(json.data ?? []);
@@ -67,13 +76,13 @@ export default function BulkGpsAttendance() {
 
   const statusColor = (status: string) => {
     const s = status.toLowerCase();
-    if (s === "present" || s === "inside") return "bg-success/15 text-success border-success/30";
-    if (s === "absent" || s === "outside") return "bg-destructive/15 text-destructive border-destructive/30";
+    if (s.includes("present") || s.includes("inside")) return "bg-success/15 text-success border-success/30";
+    if (s.includes("absent") || s.includes("outside")) return "bg-destructive/15 text-destructive border-destructive/30";
     return "bg-warning/15 text-warning border-warning/30";
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout title="Bulk GPS Attendance">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Bulk GPS Attendance</h1>
@@ -162,7 +171,7 @@ export default function BulkGpsAttendance() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Driver ID</TableHead>
+                      <TableHead>Driver Name</TableHead>
                       <TableHead>Time In</TableHead>
                       <TableHead>Time Out</TableHead>
                       <TableHead>Total Hours</TableHead>
@@ -171,8 +180,8 @@ export default function BulkGpsAttendance() {
                   </TableHeader>
                   <TableBody>
                     {data.map((row) => (
-                      <TableRow key={row.driver_id}>
-                        <TableCell className="font-medium">{row.driver_id}</TableCell>
+                      <TableRow key={`${row.driver_name}-${row.first_in}-${row.last_out}`}>
+                        <TableCell className="font-medium">{row.driver_name}</TableCell>
                         <TableCell>
                           <span className="flex items-center gap-1.5">
                             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
