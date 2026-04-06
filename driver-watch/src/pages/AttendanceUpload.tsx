@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2 } from "lucide-react";
+import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2, MapPin, ClipboardList } from "lucide-react";
+import BulkGpsAttendance from "./BulkGpsAttendance";
 import { toast } from "sonner";
 
 interface RawRow {
