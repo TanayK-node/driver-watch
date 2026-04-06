@@ -21,6 +21,9 @@ export type Database = {
           created_at: string | null
           date: string | null
           driver_id: string | null
+          gps_first_in: string | null
+          gps_last_out: string | null
+          gps_total_hours: number | null
           id: number
           raw_name: string | null
           source: string | null
@@ -31,6 +34,9 @@ export type Database = {
           created_at?: string | null
           date?: string | null
           driver_id?: string | null
+          gps_first_in?: string | null
+          gps_last_out?: string | null
+          gps_total_hours?: number | null
           id?: number
           raw_name?: string | null
           source?: string | null
@@ -41,6 +47,9 @@ export type Database = {
           created_at?: string | null
           date?: string | null
           driver_id?: string | null
+          gps_first_in?: string | null
+          gps_last_out?: string | null
+          gps_total_hours?: number | null
           id?: number
           raw_name?: string | null
           source?: string | null

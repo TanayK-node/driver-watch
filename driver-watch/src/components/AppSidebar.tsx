@@ -1,4 +1,4 @@
-import { Users, ClipboardCheck, Upload, Route, BarChart3, Map, MapPin } from "lucide-react";
+import { Users, ClipboardCheck, Upload, Route, BarChart3, Map } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -20,7 +20,6 @@ const items = [
   { title: "Route Adherence", url: "/routes", icon: Route },
   { title: "Trip Analytics", url: "/trips", icon: BarChart3 },
   { title: "Live Map", url: "/map", icon: Map },
-  { title: "GPS Attendance", url: "/gps-attendance", icon: MapPin },
 ];
 
 export function AppSidebar() {

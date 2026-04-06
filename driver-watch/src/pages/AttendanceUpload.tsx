@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2 } from "lucide-react";
+import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2, MapPin, ClipboardList } from "lucide-react";
+import BulkGpsAttendance from "./BulkGpsAttendance";
 import { toast } from "sonner";
 
 interface RawRow {
@@ -245,9 +247,27 @@ export default function AttendanceUpload() {
   };
 
   return (
-    <DashboardLayout title="Upload Attendance">
+    <DashboardLayout title="Attendance Uploads">
       <div className="space-y-6 max-w-5xl">
-        {/* Step indicators */}
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Attendance Uploads</h1>
+          <p className="text-muted-foreground text-sm">Upload and process driver attendance records.</p>
+        </div>
+
+        <Tabs defaultValue="manual" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="manual" className="gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Manual Upload
+            </TabsTrigger>
+            <TabsTrigger value="gps" className="gap-2">
+              <MapPin className="h-4 w-4" />
+              GPS Upload
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="manual" className="mt-6">
+            <div className="space-y-6">
         <div className="flex gap-2">
           {(["upload", "map", "review"] as Step[]).map((s, i) => (
             <Badge
@@ -510,6 +530,13 @@ export default function AttendanceUpload() {
             </CardContent>
           </Card>
         )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="gps" className="mt-6">
+            <BulkGpsAttendance />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

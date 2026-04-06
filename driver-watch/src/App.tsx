@@ -31,7 +31,7 @@ const App = () => (
           <Route path="/routes" element={<RouteAdherence />} />
           <Route path="/trips" element={<TripAnalytics />} />
           <Route path="/map" element={<LiveMap />} />
-          <Route path="/gps-attendance" element={<BulkGpsAttendance />} />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
