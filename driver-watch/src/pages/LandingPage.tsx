@@ -64,12 +64,13 @@ export default function LandingPage() {
                 <div className="space-y-4">
                   <p className="text-sm font-medium text-primary">Driver Monitoring and Operational Intelligence</p>
                   <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-                    Smart overview for your fleet operations.
+                    Driver Monitoring and Operational Intelligence Dashboard
                   </h1>
                   <p className="max-w-xl text-sm text-muted-foreground md:text-base">
-                    A quick visual summary of attendance, GPS movement, and verification status.
+                    The Driver Monitoring and Operational Intelligence Dashboard is designed as an automated analytical system to monitor and evaluate the operational behavior of registered auto drivers using structured trip and movement data. 
+
                   </p>
-                  <div className="flex flex-wrap gap-3">
+                  {/* <div className="flex flex-wrap gap-3">
                     <Button onClick={() => navigate("/drivers")} className="gap-2">
                       Explore Drivers
                       <ArrowRight className="h-4 w-4" />
@@ -82,7 +83,7 @@ export default function LandingPage() {
                       <MapPinned className="h-4 w-4" />
                       View Routes
                     </Button>
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="space-y-4">

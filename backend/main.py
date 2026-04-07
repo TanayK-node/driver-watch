@@ -77,7 +77,7 @@ async def sync_mongo_drivers_to_supabase():
         vehicle_map = {}
         
         for vehicle in iitb_vehicles:
-            user_id = vehicle.get("_id") # <-- UPDATE THIS KEY IF NEEDED
+            user_id = vehicle.get("userId") # <-- UPDATE THIS KEY IF NEEDED
             if user_id:
                 target_user_ids.append(user_id)
                 # Store vehicle details in a map so we can combine it with the user data later
