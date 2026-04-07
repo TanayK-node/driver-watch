@@ -7,3 +7,4 @@ shapely==2.0.3
 supabase==2.4.1
 python-dotenv==1.0.1
 python-multipart==0.0.9
+pymongo==4.6.2

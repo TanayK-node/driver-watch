@@ -7,6 +7,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from pymongo import MongoClient
 
 # Load environment variables
 load_dotenv()
@@ -17,6 +18,20 @@ key = os.environ.get("SUPABASE_KEY")
 if not url or not key:
     raise ValueError("Missing Supabase credentials in .env file")
 supabase: Client = create_client(url, key)
+
+# Initialize MongoDB Client
+mongo_uri = os.environ.get("MONGO_URI")
+if mongo_uri:
+    try:
+        mongo_client = MongoClient(mongo_uri)
+        mongo_db = mongo_client["your_db_name"] # Update with your DB name
+        
+        # Reference BOTH collections
+        mongo_users_col = mongo_db["users"] 
+        mongo_vehicles_col = mongo_db["drivervehicledetails"] 
+    except Exception as e:
+        print(f"Failed to connect to MongoDB: {e}")
+        mongo_client = None
 
 # Initialize FastAPI App
 app = FastAPI(title="Driver Attendance GPS Backend")
@@ -43,6 +58,92 @@ except Exception as e:
     print(f"Warning: Could not load boundary file. Make sure {BOUNDARY_FILE_PATH} exists.")
     campus_boundary = None
 
+@app.post("/api/sync-drivers")
+async def sync_mongo_drivers_to_supabase():
+    if mongo_client is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not configured.")
+
+    try:
+        # STEP 1: Find all vehicles registered to IITB
+        iitb_vehicles = list(mongo_vehicles_col.find({"organization": "IITB Campus Auto"}))
+        
+        if not iitb_vehicles:
+            return {"status": "success", "message": "No IITB drivers found in MongoDB.", "synced_count": 0}
+
+        # STEP 2: Extract the user IDs 
+        # (Assuming the field linking the vehicle to the user is called 'userId'. 
+        # Change 'userId' below if your MongoDB uses 'user_id' or simply 'user')
+        target_user_ids = []
+        vehicle_map = {}
+        
+        for vehicle in iitb_vehicles:
+            user_id = vehicle.get("_id") # <-- UPDATE THIS KEY IF NEEDED
+            if user_id:
+                target_user_ids.append(user_id)
+                # Store vehicle details in a map so we can combine it with the user data later
+                vehicle_map[str(user_id)] = vehicle
+
+        # STEP 3: Fetch the actual User profiles using those IDs
+        # The $in operator finds all users whose _id matches one in our target list
+        users = list(mongo_users_col.find({"_id": {"$in": target_user_ids}}))
+
+        # STEP 4: Format the combined data for Supabase
+        supabase_payload = []
+        for user in users:
+            uid_str = str(user.get("_id"))
+            
+            # Grab the matching vehicle info we saved earlier
+            vehicle_info = vehicle_map.get(uid_str, {})
+
+            supabase_payload.append({
+                "driverId": uid_str,
+                "name": user.get("name", "Unknown Driver"),
+                "phone": user.get("phone", ""),
+                
+                # Data from the drivervehicledetails collection:
+                "organization": vehicle_info.get("organization", "IITB Campus Auto"),
+                "vehicleClass": vehicle_info.get("vehicleClass", ""),
+                "vehicleMake": vehicle_info.get("vehicleMake", ""),
+                "vehicleModel": vehicle_info.get("vehicleModel", ""),
+                "vehicleRegistrationNo": vehicle_info.get("registrationNo", "")
+            })
+
+        # STEP 5: Push to Supabase using UPSERT
+        if supabase_payload:
+            supabase.table('drivers').upsert(
+                supabase_payload,
+                on_conflict='driverId'
+            ).execute()
+
+        return {
+            "status": "success",
+            "message": f"Successfully synced {len(supabase_payload)} IITB drivers.",
+            "synced_count": len(supabase_payload)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync error: {str(e)}")
+    
+
+@app.get("/api/external/drivers")
+async def fetch_mongo_drivers():
+    if mongo_client is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+    
+    try:
+        # Fetch all drivers from the collection
+        # We exclude the MongoDB internal '_id' field because it's not JSON serializable by default
+        cursor = mongo_drivers_collection.find({}, {"_id": 0}) 
+        drivers_list = list(cursor)
+        
+        return {
+            "status": "success",
+            "total_drivers": len(drivers_list),
+            "data": drivers_list
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching from MongoDB: {str(e)}")
+    
 @app.post("/api/attendance/verify-gps-bulk")
 async def verify_gps_attendance_bulk(
     file: UploadFile = File(...)
