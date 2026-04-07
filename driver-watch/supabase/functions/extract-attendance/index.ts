@@ -18,7 +18,8 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     if (!imageBase64) throw new Error("imageBase64 is required");
-
+    
+    // Safely extract and deduplicate driver names
     const uniqueDriverNames = Array.from(
       new Set(
         (drivers || [])
@@ -29,16 +30,29 @@ serve(async (req) => {
 
     const driverList = uniqueDriverNames.join("\n");
     const today = new Date().toISOString().slice(0, 10);
-
-    const systemPrompt = `You are an attendance data extractor. This is attendance data from a gate register image.
-
+    
+    const systemPrompt = `You are an expert data entry assistant reading a handwritten gate register. 
+    
 Assume date = ${today} if a row has no visible date.
+
+This is the STRICT, ALLOWED LIST of driver names from my database:
+=== DRIVER LIST ===
+${driverList}
+===================
+
+CRITICAL INSTRUCTION FOR NAME MAPPING:
+When you read a handwritten name, you MUST perform a "fuzzy match" against the DRIVER LIST. 
+- If the handwritten name is abbreviated (e.g., "Deepak P.").
+- If it is missing a middle name (e.g., "Deepak Panhalkar").
+- If it is misspelled (e.g., "Depak").
+You must STILL output the EXACT full name from the DRIVER LIST. 
+DO NOT output the literal handwritten name. If a name is completely illegible and cannot be matched to the list, skip that row entirely.
 
 Give records in this exact structure and return ONLY JSON:
 {
   "rows": [
     {
-      "rawName": "Driver Name",
+      "rawName": "EXACT MATCH FROM DRIVER LIST",
       "date": "YYYY-MM-DD",
       "inTime": "HH:MM",
       "outTime": "HH:MM or empty string"
@@ -46,19 +60,14 @@ Give records in this exact structure and return ONLY JSON:
   ]
 }
 
-This is the list of driver names. This list is VERY IMPORTANT.
-Use ONLY these names in rawName (exact spelling from the list):
-${driverList}
-
 Rules:
 - Extract all attendance rows visible in the image.
-- rawName must be exactly one name from the list above. Do not invent or alter names.
-- If a handwritten name is unclear, choose the closest valid name from the list.
+- rawName MUST exactly match a name from the list.
 - Convert all dates to YYYY-MM-DD format.
 - If date is missing on a row, use ${today}.
 - Convert all times to 24-hour HH:MM format.
 - If out time is missing, set outTime to empty string "".
-- Return ONLY valid JSON. No markdown, no explanation, no extra keys.
+- Return ONLY valid JSON.
 - If no attendance rows are readable, return {"rows": []}.`;
 
     const response = await fetch(
@@ -71,6 +80,7 @@ Rules:
         },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
+          response_format: { type: "json_object" }, // Forces strict JSON output
           messages: [
             { role: "system", content: systemPrompt },
             {
@@ -82,7 +92,7 @@ Rules:
                 },
                 {
                   type: "text",
-                  text: "Extract attendance and map each driver to ONLY the provided driver list names.",
+                  text: "Extract attendance and fuzzy-match every name directly to the provided driver list.",
                 },
               ],
             },
