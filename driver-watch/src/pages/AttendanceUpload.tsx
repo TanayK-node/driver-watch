@@ -48,6 +48,39 @@ function normalizeDate(raw: string): string {
   return trimmed;
 }
 
+/** Convert common time variants (8.26, 8:26 AM, 0826) to HH:MM for Postgres time columns. */
+function normalizeTime(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  const compact = trimmed
+    .replace(/\.(?=\d)/g, ":")
+    .replace(/\s+/g, " ")
+    .replace(/\b([ap])\.m\.?\b/gi, "$1m")
+    .toUpperCase();
+
+  const timeMatch = compact.match(/^([0-2]?\d)(?::?(\d{2}))?(?::?(\d{2}))?\s*([AP]M)?$/);
+  if (!timeMatch) return trimmed;
+
+  let hour = Number.parseInt(timeMatch[1], 10);
+  const minute = Number.parseInt(timeMatch[2] ?? "0", 10);
+  const second = Number.parseInt(timeMatch[3] ?? "0", 10);
+  const period = timeMatch[4];
+
+  if (Number.isNaN(hour) || Number.isNaN(minute) || Number.isNaN(second)) return trimmed;
+  if (minute > 59 || second > 59) return trimmed;
+
+  if (period === "AM") {
+    if (hour === 12) hour = 0;
+  } else if (period === "PM" && hour < 12) {
+    hour += 12;
+  }
+
+  if (hour > 23) return trimmed;
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 export default function AttendanceUpload() {
   const [step, setStep] = useState<Step>("upload");
   const [pasteData, setPasteData] = useState("");
@@ -66,22 +99,58 @@ export default function AttendanceUpload() {
   });
 
   const parseCSV = (text: string): RawRow[] => {
-    const lines = text.trim().split("\n").filter(Boolean);
-    if (lines.length < 2) return [];
-    const rows: RawRow[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(/[,\t]/).map((c) => c.trim().replace(/^"|"$/g, ""));
-      if (cols.length >= 4) {
+  // Split by newline and remove empty lines (handles \r\n from Windows CSVs)
+  const lines = text.trim().split("\n").filter(Boolean);
+  
+  // We need at least the Date row (0), In/Out header row (1), and 1 driver data row (2)
+  if (lines.length < 3) return []; 
+
+  const rows: RawRow[] = [];
+  
+  // Row 1 (index 0) contains the dates.
+  const dateHeaders = lines[0].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+  
+  const dateColumns: { date: string; colIndex: number }[] = [];
+  
+  // Find all columns that have a date. 
+  // In your file, dates are at index 1, 3, 5, etc.
+  for (let i = 1; i < dateHeaders.length; i++) {
+    if (dateHeaders[i] && dateHeaders[i] !== "") {
+      dateColumns.push({ 
+        // The existing normalizeDate function safely converts DD-MM-YYYY to YYYY-MM-DD
+        date: normalizeDate(dateHeaders[i]), 
+        colIndex: i 
+      });
+    }
+  }
+
+  // Row 3 (index 2) onwards are the driver rows containing the times.
+  for (let i = 2; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    const rawName = cols[0]; // Column 0 is "NAME OF AUTO DRIVER"
+    
+    if (!rawName) continue;
+
+    // For this specific driver, loop through all the detected date columns
+    for (const { date, colIndex } of dateColumns) {
+      const inTime = normalizeTime(cols[colIndex] || "");
+      const outTime = normalizeTime(cols[colIndex + 1] || ""); // The immediate next column is the Out Time
+
+      // Only push a record if the driver actually has an In Time or Out Time logged for that day
+      // This automatically ignores days where the cells are completely empty (e.g., ",,,")
+      if (inTime || outTime) {
         rows.push({
-          rawName: cols[0],
-          date: normalizeDate(cols[1]),
-          inTime: cols[2],
-          outTime: cols[3],
+          rawName,
+          date,
+          inTime: inTime || "",
+          outTime: outTime || "",
         });
       }
     }
-    return rows;
-  };
+  }
+
+  return rows;
+};
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -143,8 +212,8 @@ export default function AttendanceUpload() {
       const rows: RawRow[] = (data?.rows || []).map((r: any) => ({
         rawName: r.rawName || "",
         date: normalizeDate(r.date || ""),
-        inTime: r.inTime || "",
-        outTime: r.outTime || "",
+        inTime: normalizeTime(r.inTime || ""),
+        outTime: normalizeTime(r.outTime || ""),
       }));
 
       if (rows.length === 0) {
@@ -218,8 +287,8 @@ export default function AttendanceUpload() {
       driver_id: r.driverId!,
       raw_name: r.rawName,
       date: r.date,
-      check_in: r.inTime || null,
-      check_out: r.outTime || null,
+      check_in: normalizeTime(r.inTime) || null,
+      check_out: normalizeTime(r.outTime) || null,
       source: "manual",
     }));
 
