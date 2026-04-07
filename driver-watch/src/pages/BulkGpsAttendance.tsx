@@ -44,7 +44,7 @@ export default function BulkGpsAttendance() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("http://localhost:8000/api/attendance/verify-gps-bulk", {
+      const res = await fetch("http://driver-watch.onrender.com/api/attendance/verify-gps-bulk", {
         method: "POST",
         body: formData,
       });
