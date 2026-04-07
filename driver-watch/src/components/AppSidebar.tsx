@@ -1,6 +1,7 @@
-import { Home, Users, ClipboardCheck, Upload, Route, BarChart3, Map } from "lucide-react";
+import { Home, Users, ClipboardCheck, Upload, Route, BarChart3, Map, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -10,8 +11,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 
 const items = [
   { title: "Home", url: "/", icon: Home },
@@ -26,7 +29,12 @@ const items = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -62,6 +70,17 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-3">
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "default"}
+          className="w-full justify-start text-muted-foreground hover:text-destructive"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">Logout</span>}
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }
