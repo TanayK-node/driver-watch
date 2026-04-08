@@ -1,6 +1,7 @@
 # main.py
 import os
 import io
+from datetime import datetime
 import pandas as pd
 import geopandas as gpd
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -8,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from bson import ObjectId
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +22,10 @@ if not url or not key:
 supabase: Client = create_client(url, key)
 
 # Initialize MongoDB Client
+mongo_client = None
+mongo_users_col = None
+mongo_vehicles_col = None
+
 mongo_uri = os.environ.get("MONGO_URI")
 if mongo_uri:
     try:
@@ -58,12 +64,10 @@ except Exception as e:
     print(f"Warning: Could not load boundary file. Make sure {BOUNDARY_FILE_PATH} exists.")
     campus_boundary = None
 
-from fastapi import HTTPException
-from bson import ObjectId
 
 @app.post("/api/sync-drivers")
 async def sync_mongo_drivers_to_supabase():
-    if mongo_client is None:
+    if mongo_client is None or mongo_users_col is None or mongo_vehicles_col is None:
         raise HTTPException(status_code=500, detail="MongoDB connection not configured.")
 
     try:
@@ -80,7 +84,7 @@ async def sync_mongo_drivers_to_supabase():
                 "synced_count": 0
             }
 
-        # STEP 2: Convert driverId → ObjectId and build map
+        # STEP 2: Convert driverId → ObjectId
         target_user_ids = []
         vehicle_map = {}
 
@@ -91,10 +95,10 @@ async def sync_mongo_drivers_to_supabase():
                 continue
 
             try:
-                obj_id = ObjectId(driver_id)  # 🔥 FIXED
+                obj_id = ObjectId(driver_id)
                 target_user_ids.append(obj_id)
-                vehicle_map[str(obj_id)] = vehicle  # map using string for later lookup
-            except Exception as e:
+                vehicle_map[str(obj_id)] = vehicle
+            except:
                 print(f"⚠️ Invalid ObjectId: {driver_id}")
                 continue
 
@@ -105,13 +109,18 @@ async def sync_mongo_drivers_to_supabase():
                 "synced_count": 0
             }
 
-        # STEP 3: Fetch matching users
+        # STEP 3: Fetch users
         users = list(
             mongo_users_col.find({"_id": {"$in": target_user_ids}})
         )
         print(f"🔍 Found {len(users)} matching users")
-
-        # STEP 4: Merge user + vehicle data
+        def safe_date(val):
+            if isinstance(val, datetime):
+                return val.isoformat()
+            if isinstance(val, str):
+                return val
+            return None
+        # STEP 4: Merge + map all fields
         supabase_payload = []
 
         for user in users:
@@ -119,24 +128,60 @@ async def sync_mongo_drivers_to_supabase():
             vehicle_info = vehicle_map.get(uid_str, {})
 
             supabase_payload.append({
+                # 🔹 Core
                 "driverId": uid_str,
                 "name": user.get("name", "Unknown Driver"),
                 "phone": user.get("phone", ""),
 
-                # vehicle data
+                # 🔹 NEW FIELDS (from users collection)
+                "email": user.get("email", ""),
+                "image": user.get("image"),  # can be null
+                "address": user.get("address", ""),
+                "rating": user.get("rating", 0),
+                "gender": user.get("gender", ""),
+                
+                "dob": safe_date(user.get("dateOfBirth")),
+                "created_at": safe_date(user.get("createdAt")),
+
+                # 🔹 Vehicle data
                 "organization": vehicle_info.get("organization", "IITB Campus Auto"),
                 "vehicleClass": vehicle_info.get("vehicleClass", ""),
                 "vehicleMake": vehicle_info.get("vehicleMake", ""),
                 "vehicleModel": vehicle_info.get("vehicleModel", ""),
-                "vehicleRegistrationNo": vehicle_info.get("vehicleRegistrationNo", "")  # ✅ FIXED
+                "vehicleRegistrationNo": vehicle_info.get("vehicleRegistrationNo", "")
             })
 
         # STEP 5: Push to Supabase
         if supabase_payload:
-            supabase.table("drivers").upsert(
-                supabase_payload,
-                on_conflict="driverId"
-            ).execute()
+            try:
+                supabase.table("drivers").upsert(
+                    supabase_payload,
+                    on_conflict="driverId"
+                ).execute()
+            except Exception as upsert_error:
+                error_text = str(upsert_error)
+                if "column" in error_text.lower() and "drivers" in error_text.lower():
+                    # Fallback for environments where optional Mongo fields are not yet in schema.
+                    base_payload = [
+                        {
+                            "driverId": row["driverId"],
+                            "name": row.get("name"),
+                            "phone": row.get("phone"),
+                            "organization": row.get("organization"),
+                            "vehicleClass": row.get("vehicleClass"),
+                            "vehicleMake": row.get("vehicleMake"),
+                            "vehicleModel": row.get("vehicleModel"),
+                            "vehicleRegistrationNo": row.get("vehicleRegistrationNo"),
+                            "created_at": row.get("created_at"),
+                        }
+                        for row in supabase_payload
+                    ]
+                    supabase.table("drivers").upsert(
+                        base_payload,
+                        on_conflict="driverId"
+                    ).execute()
+                else:
+                    raise
 
         return {
             "status": "success",
@@ -146,17 +191,16 @@ async def sync_mongo_drivers_to_supabase():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sync error: {str(e)}")
-    
 
 @app.get("/api/external/drivers")
 async def fetch_mongo_drivers():
-    if mongo_client is None:
+    if mongo_client is None or mongo_users_col is None:
         raise HTTPException(status_code=500, detail="MongoDB connection not established.")
     
     try:
         # Fetch all drivers from the collection
         # We exclude the MongoDB internal '_id' field because it's not JSON serializable by default
-        cursor = mongo_drivers_collection.find({}, {"_id": 0}) 
+        cursor = mongo_users_col.find({}, {"_id": 0}) 
         drivers_list = list(cursor)
         
         return {

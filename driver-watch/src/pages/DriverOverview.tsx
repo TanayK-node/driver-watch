@@ -36,7 +36,8 @@ export default function DriverOverview() {
   const handleSyncMongo = async () => {
     setIsSyncing(true);
     try {
-      const response = await fetch("https://driver-watch.onrender.com/api/sync-drivers", {
+      // const response = await fetch("https://driver-watch.onrender.com/api/sync-drivers", {
+      const response = await fetch("http://127.0.0.1:8000/api/sync-drivers", {
         method: "POST",
       });
       if (!response.ok) throw new Error("Failed to sync");

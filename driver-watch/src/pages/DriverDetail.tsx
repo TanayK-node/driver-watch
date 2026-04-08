@@ -5,11 +5,17 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Phone, Car, CreditCard, Building2, Palette } from "lucide-react";
+import { ArrowLeft, Phone, Car, CreditCard, Building2, Palette, Mail, MapPin, Star, CalendarDays, User } from "lucide-react";
 
 export default function DriverDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleDateString();
+  };
 
   const { data: driver, isLoading } = useQuery({
     queryKey: ["driver", id],
@@ -47,6 +53,21 @@ export default function DriverDetail() {
     );
   }
 
+  const driverExtra = driver as typeof driver & {
+    email?: string | null;
+    image?: string | null;
+    address?: string | null;
+    rating?: number | null;
+    dob?: string | null;
+    gender?: string | null;
+    createdAt?: string | null;
+  };
+
+  const displayImage = driverExtra.image;
+  const joinedDate = formatDate(driverExtra.createdAt || driver.created_at);
+  const dobDate = formatDate(driverExtra.dob);
+  const ratingText = typeof driverExtra.rating === "number" ? driverExtra.rating.toFixed(1) : "-";
+
   return (
     <DashboardLayout title={driver.name || "Driver"}>
       <div className="space-y-6">
@@ -59,9 +80,17 @@ export default function DriverDetail() {
             <CardHeader><CardTitle className="text-base">Personal Info</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                  {driver.name?.charAt(0) || "?"}
-                </div>
+                {displayImage ? (
+                  <img
+                    src={displayImage}
+                    alt={`${driver.name || "Driver"} profile`}
+                    className="h-12 w-12 rounded-full object-cover border"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
+                    {driver.name?.charAt(0) || "?"}
+                  </div>
+                )}
                 <div>
                   <p className="font-semibold text-foreground">{driver.name || "Unknown"}</p>
                   <p className="text-sm text-muted-foreground font-mono">{driver.driverId}</p>
@@ -69,13 +98,31 @@ export default function DriverDetail() {
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="h-4 w-4" /> {driver.phone || "—"}
+                  <Phone className="h-4 w-4" /> {driver.phone || "-"}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <CreditCard className="h-4 w-4" /> License: {driver.driverLicenseNo || "—"}
+                  <Mail className="h-4 w-4" /> {driverExtra.email || "-"}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <MapPin className="h-4 w-4" /> {driverExtra.address || "-"}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <User className="h-4 w-4" /> {driverExtra.gender || "-"}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CalendarDays className="h-4 w-4" /> DOB: {dobDate}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Star className="h-4 w-4" /> Rating: {ratingText}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Building2 className="h-4 w-4" /> {driver.organization || "—"}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CreditCard className="h-4 w-4" /> License: {driver.driverLicenseNo || "-"}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CalendarDays className="h-4 w-4" /> Joined: {joinedDate}
                 </div>
               </div>
             </CardContent>
