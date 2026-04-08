@@ -64,7 +64,7 @@ export default function DriverOverview() {
   const organizations = [...new Set(drivers.map((d) => d.organization).filter(Boolean))];
 
   const filtered = drivers.filter((d) => {
-    const driverColor = (d.color ?? "").toLowerCase().trim();
+    const driverColor = (d.vehicleColor ?? "").toLowerCase().trim();
     const matchSearch =
       (d.name?.toLowerCase() || "").includes(search.toLowerCase()) ||
       d.driverId.toLowerCase().includes(search.toLowerCase()) ||
@@ -80,8 +80,7 @@ export default function DriverOverview() {
       "gaurav",
       "avijit maji",
       "suso",
-      "susubhan",
-      "Tapas Office",
+      "tapas office",
       "xhx(for testing only don't booking)",
       "prathamesh",
       "rahul tanwar",
@@ -95,13 +94,12 @@ export default function DriverOverview() {
   const normalVisibleDrivers = filtered.filter(
     (d) => !featuredDriverNames.has((d.name ?? "").toLowerCase().trim())
   );
-  const hiddenDriversPreview = hiddenDrivers.slice(0, 10);
+  const visibleDrivers = showHiddenDrivers
+    ? [...normalVisibleDrivers, ...hiddenDrivers.slice(0, 10)]
+    : normalVisibleDrivers;
   const hiddenDriversCount = hiddenDrivers.length;
 
-  const driverColors = [...new Set(drivers.map((d) => d.color).filter(Boolean))];
-  const blueDriversCount = drivers.filter((d) => (d.color ?? "").toLowerCase().trim() === "blue").length;
-  const greenDriversCount = drivers.filter((d) => (d.color ?? "").toLowerCase().trim() === "green").length;
-  const yellowDriversCount = drivers.filter((d) => (d.color ?? "").toLowerCase().trim() === "yellow").length;
+  const vehicleClasses = [...new Set(drivers.map((d) => d.vehicleClass).filter(Boolean))];
 
   return (
     <DashboardLayout title="Driver Overview">
@@ -112,13 +110,7 @@ export default function DriverOverview() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           <KPICard title="Total Drivers" value={isLoading ? "..." : drivers.length} icon={Users} />
-          <KPICard
-            title="Driver Colors"
-            value={isLoading ? "..." : driverColors.length}
-            subtitle={isLoading ? "Loading..." : `Blue: ${blueDriversCount} | Green: ${greenDriversCount} | Yellow: ${yellowDriversCount}`}
-            icon={Palette}
-            accent="success"
-          />
+          <KPICard title="Vehicle Types" value={isLoading ? "..." : vehicleClasses.length} icon={Car} accent="success" />
           <KPICard title="Organizations" value={isLoading ? "..." : organizations.length} icon={Building2} />
         </div>
 
@@ -201,20 +193,10 @@ export default function DriverOverview() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {normalVisibleDrivers.map((d) => (
+                  {visibleDrivers.map((d) => (
                     <TableRow
                       key={d.driverId}
-                      className={cn(
-                        "cursor-pointer",
-                        (d.color ?? "").toLowerCase().trim() === "yellow" &&
-                          "bg-yellow-50/70 hover:bg-yellow-100/70 dark:bg-yellow-950/20 dark:hover:bg-yellow-950/35",
-                        (d.color ?? "").toLowerCase().trim() === "green" &&
-                          "bg-emerald-50/70 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35",
-                        (d.color ?? "").toLowerCase().trim() === "blue" &&
-                          "bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/35",
-                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
-                          "hover:bg-muted/50"
-                      )}
+                      className="cursor-pointer hover:bg-muted/50"
                       onClick={() => navigate(`/driver/${d.driverId}`)}
                     >
                       <TableCell className="font-medium lg:text-base">{d.name || "—"}</TableCell>
@@ -222,7 +204,7 @@ export default function DriverOverview() {
                       <TableCell className="text-sm lg:text-base">{d.organization || "—"}</TableCell>
                     </TableRow>
                   ))}
-                  {normalVisibleDrivers.length === 0 && (
+                  {visibleDrivers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                         No drivers found.
@@ -233,11 +215,11 @@ export default function DriverOverview() {
               </Table>
             ) : (
               /* TILES VIEW */
-              normalVisibleDrivers.length === 0 ? (
+              visibleDrivers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No drivers found.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {normalVisibleDrivers.map((d) => (
+                  {visibleDrivers.map((d) => (
                     <Card
                       key={d.driverId}
                       className={cn(
@@ -246,9 +228,7 @@ export default function DriverOverview() {
                           "border-yellow-300 bg-yellow-50/70 hover:border-yellow-400 dark:border-yellow-700 dark:bg-yellow-950/20",
                         (d.color ?? "").toLowerCase().trim() === "green" &&
                           "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-950/20",
-                        (d.color ?? "").toLowerCase().trim() === "blue" &&
-                          "border-blue-300 bg-blue-50/70 hover:border-blue-400 dark:border-blue-700 dark:bg-blue-950/20",
-                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
+                        !["yellow", "green"].includes((d.color ?? "").toLowerCase().trim()) &&
                           "hover:border-primary/30"
                       )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
@@ -295,8 +275,8 @@ export default function DriverOverview() {
                   onClick={() => setShowHiddenDrivers((prev) => !prev)}
                 >
                   {showHiddenDrivers
-                    ? "Hide tutem team"
-                    : `View Tutem team (test drivers) (${Math.min(hiddenDriversCount, 10)})`}
+                    ? "Hide hidden drivers"
+                    : `View hidden drivers (${Math.min(hiddenDriversCount, 10)})`}
                 </Button>
               </div>
             )}
