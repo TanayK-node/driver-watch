@@ -440,10 +440,23 @@ export default function AttendanceUpload() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rawRows.slice(0, 10).map((r, i) => (
+                     {rawRows.slice(0, 10).map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{r.rawName}</TableCell>
-                            <TableCell>{r.date}</TableCell>
+                            <TableCell>
+                              <Input
+                                type="date"
+                                value={r.date}
+                                onChange={(e) => {
+                                  setRawRows((prev) =>
+                                    prev.map((row, idx) =>
+                                      idx === i ? { ...row, date: e.target.value } : row
+                                    )
+                                  );
+                                }}
+                                className="h-8 w-36"
+                              />
+                            </TableCell>
                             <TableCell>{r.inTime}</TableCell>
                             <TableCell>{r.outTime || <span className="text-muted-foreground">—</span>}</TableCell>
                           </TableRow>
