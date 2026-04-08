@@ -1,16 +1,20 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { KPICard } from "@/components/KPICard";
-import { CalendarDays, Clock, UserCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock, UserCheck } from "lucide-react";
 
 export default function DriverAttendanceDetail() {
   const { driverId } = useParams<{ driverId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const backPath = ((location.state as { from?: string } | null)?.from) ?? "/attendance";
 
   const { data: driver } = useQuery({
     queryKey: ["driver", driverId],
@@ -67,6 +71,11 @@ export default function DriverAttendanceDetail() {
   return (
     <DashboardLayout title={`Attendance — ${driver?.name ?? driverId}`}>
       <div className="space-y-6">
+        <Button variant="outline" size="sm" onClick={() => navigate(backPath)} className="w-fit">
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KPICard title="Total Days Present" value={totalDays} icon={CalendarDays} accent="success" />
           <KPICard title="Total Gate Hours" value={formatHours(totalGateMinutes)} icon={Clock} />

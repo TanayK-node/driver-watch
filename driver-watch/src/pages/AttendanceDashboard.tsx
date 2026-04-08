@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { KPICard } from "@/components/KPICard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,16 +16,31 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Users, UserCheck, UserX, CalendarIcon, AlertTriangle, ShieldCheck, Upload, BarChart3 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AttendanceUpload from "./AttendanceUpload";
 
 export default function AttendanceDashboard() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [driverFilter, setDriverFilter] = useState<string>("all");
   const navigate = useNavigate();
+  const location = useLocation();
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const dateFromQuery = new URLSearchParams(location.search).get("date");
+    if (dateFromQuery) {
+      const parsedDate = parseISO(dateFromQuery);
+      if (isValid(parsedDate)) return parsedDate;
+    }
+    return new Date();
+  });
+  const [driverFilter, setDriverFilter] = useState<string>("all");
   const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+  useEffect(() => {
+    const currentDateInQuery = new URLSearchParams(location.search).get("date");
+    if (currentDateInQuery !== dateStr) {
+      navigate(`/attendance?date=${dateStr}`, { replace: true });
+    }
+  }, [dateStr, location.search, navigate]);
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["drivers-all"],
@@ -277,7 +292,11 @@ export default function AttendanceDashboard() {
                       <TableRow
                         key={record.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/attendance/driver/${record.driver_id}`)}
+                        onClick={() =>
+                          navigate(`/attendance/driver/${record.driver_id}`, {
+                            state: { from: `/attendance?date=${dateStr}` },
+                          })
+                        }
                       >
                         <TableCell className="font-medium">{getDriverName(record.driver_id)}</TableCell>
                         
