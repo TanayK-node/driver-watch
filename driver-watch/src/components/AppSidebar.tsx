@@ -20,7 +20,7 @@ const items = [
   { title: "Home", url: "/", icon: Home },
   { title: "Drivers", url: "/drivers", icon: Users },
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
-  { title: "Upload Attendance", url: "/attendance/upload", icon: Upload },
+  
   { title: "Route Adherence", url: "/routes", icon: Route },
   { title: "Trip Analytics", url: "/trips", icon: BarChart3 },
   { title: "Live Map", url: "/map", icon: Map },
