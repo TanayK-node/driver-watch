@@ -1,4 +1,4 @@
-import { Home, Users, ClipboardCheck, Upload, Route, BarChart3, Map, LogOut } from "lucide-react";
+import { Home, Users, ClipboardCheck, Route, BarChart3, Map, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
