@@ -18,6 +18,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 export default function DriverOverview() {
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState<string>("all");
+  const [colorFilter, setColorFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<string>("table");
   const [showHiddenDrivers, setShowHiddenDrivers] = useState(false);
   const navigate = useNavigate();
@@ -63,12 +64,14 @@ export default function DriverOverview() {
   const organizations = [...new Set(drivers.map((d) => d.organization).filter(Boolean))];
 
   const filtered = drivers.filter((d) => {
+    const driverColor = (d.color ?? "").toLowerCase().trim();
     const matchSearch =
       (d.name?.toLowerCase() || "").includes(search.toLowerCase()) ||
       d.driverId.toLowerCase().includes(search.toLowerCase()) ||
       (d.vehicleRegistrationNo?.toLowerCase() || "").includes(search.toLowerCase());
     const matchOrg = orgFilter === "all" || d.organization === orgFilter;
-    return matchSearch && matchOrg;
+    const matchColor = colorFilter === "all" || driverColor === colorFilter;
+    return matchSearch && matchOrg && matchColor;
   });
 
   const featuredDriverNames = new Set(
@@ -101,6 +104,10 @@ export default function DriverOverview() {
   return (
     <DashboardLayout title="Driver Overview">
       <div className="space-y-6 lg:space-y-8">
+        <p className="text-xs text-muted-foreground">
+          This page gives an overview of all drivers and their details.
+        </p>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           <KPICard title="Total Drivers" value={isLoading ? "..." : drivers.length} icon={Users} />
           <KPICard title="Vehicle Types" value={isLoading ? "..." : vehicleClasses.length} icon={Car} accent="success" />
@@ -132,7 +139,7 @@ export default function DriverOverview() {
                     placeholder="Search drivers..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8 w-[220px] lg:w-[280px] lg:text-base"
+                    className="pl-8 w-[220px] lg:w-[240px] lg:text-base"
                   />
                 </div>
                 <Select value={orgFilter} onValueChange={setOrgFilter}>
@@ -144,6 +151,16 @@ export default function DriverOverview() {
                     {organizations.map((org) => (
                       <SelectItem key={org} value={org!}>{org}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <Select value={colorFilter} onValueChange={setColorFilter}>
+                  <SelectTrigger className="w-[150px] lg:w-[170px] lg:text-base">
+                    <SelectValue placeholder="Color" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Colors</SelectItem>
+                    <SelectItem value="yellow">Yellow</SelectItem>
+                    <SelectItem value="green">Green</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -204,7 +221,15 @@ export default function DriverOverview() {
                   {visibleDrivers.map((d) => (
                     <Card
                       key={d.driverId}
-                      className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
+                      className={cn(
+                        "cursor-pointer hover:shadow-md transition-all",
+                        (d.color ?? "").toLowerCase().trim() === "yellow" &&
+                          "border-yellow-300 bg-yellow-50/70 hover:border-yellow-400 dark:border-yellow-700 dark:bg-yellow-950/20",
+                        (d.color ?? "").toLowerCase().trim() === "green" &&
+                          "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-950/20",
+                        !["yellow", "green"].includes((d.color ?? "").toLowerCase().trim()) &&
+                          "hover:border-primary/30"
+                      )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
                     >
                       <CardContent className="p-4 lg:p-5 space-y-3">

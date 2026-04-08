@@ -186,7 +186,7 @@ export default function AttendanceDashboard() {
         <TabsList>
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
-            Dashboard
+            Insights
           </TabsTrigger>
           <TabsTrigger value="upload" className="gap-2">
             <Upload className="h-4 w-4" />
