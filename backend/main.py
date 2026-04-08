@@ -66,7 +66,7 @@ async def sync_mongo_drivers_to_supabase():
     try:
         # STEP 1: Find all vehicles registered to IITB
         iitb_vehicles = list(mongo_vehicles_col.find({"organization": "IITB Campus Auto"}))
-        
+        print(f"🔍 MONGO TEST: Found {len(iitb_vehicles)} vehicles for IITB in drivervehicledetails")
         if not iitb_vehicles:
             return {"status": "success", "message": "No IITB drivers found in MongoDB.", "synced_count": 0}
 
@@ -86,7 +86,7 @@ async def sync_mongo_drivers_to_supabase():
         # STEP 3: Fetch the actual User profiles using those IDs
         # The $in operator finds all users whose _id matches one in our target list
         users = list(mongo_users_col.find({"_id": {"$in": target_user_ids}}))
-
+        print(f"🔍 MONGO TEST: Found {len(users)} matching user profiles in the users collection")
         # STEP 4: Format the combined data for Supabase
         supabase_payload = []
         for user in users:
