@@ -19,6 +19,7 @@ export default function DriverOverview() {
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<string>("table");
+  const [showHiddenDrivers, setShowHiddenDrivers] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -69,6 +70,31 @@ export default function DriverOverview() {
     const matchOrg = orgFilter === "all" || d.organization === orgFilter;
     return matchSearch && matchOrg;
   });
+
+  const featuredDriverNames = new Set(
+    [
+      "uma driver aws",
+      "gaurav",
+      "avijit maji",
+      "suso",
+      "tapas office",
+      "xhx(for testing only don't booking)",
+      "prathamesh",
+      "rahul tanwar",
+      "yameen",
+    ].map((name) => name.toLowerCase().trim())
+  );
+
+  const hiddenDrivers = filtered.filter((d) =>
+    featuredDriverNames.has((d.name ?? "").toLowerCase().trim())
+  );
+  const normalVisibleDrivers = filtered.filter(
+    (d) => !featuredDriverNames.has((d.name ?? "").toLowerCase().trim())
+  );
+  const visibleDrivers = showHiddenDrivers
+    ? [...normalVisibleDrivers, ...hiddenDrivers.slice(0, 10)]
+    : normalVisibleDrivers;
+  const hiddenDriversCount = hiddenDrivers.length;
 
   const vehicleClasses = [...new Set(drivers.map((d) => d.vehicleClass).filter(Boolean))];
 
@@ -149,7 +175,7 @@ export default function DriverOverview() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((d) => (
+                  {visibleDrivers.map((d) => (
                     <TableRow
                       key={d.driverId}
                       className="cursor-pointer hover:bg-muted/50"
@@ -160,7 +186,7 @@ export default function DriverOverview() {
                       <TableCell className="text-sm lg:text-base">{d.organization || "—"}</TableCell>
                     </TableRow>
                   ))}
-                  {filtered.length === 0 && (
+                  {visibleDrivers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                         No drivers found.
@@ -171,11 +197,11 @@ export default function DriverOverview() {
               </Table>
             ) : (
               /* TILES VIEW */
-              filtered.length === 0 ? (
+              visibleDrivers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No drivers found.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filtered.map((d) => (
+                  {visibleDrivers.map((d) => (
                     <Card
                       key={d.driverId}
                       className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
@@ -212,6 +238,21 @@ export default function DriverOverview() {
                   ))}
                 </div>
               )
+            )}
+            {!isLoading && filtered.length > 0 && hiddenDriversCount > 0 && (
+              <div className="mt-4 flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary hover:text-primary"
+                  onClick={() => setShowHiddenDrivers((prev) => !prev)}
+                >
+                  {showHiddenDrivers
+                    ? "Hide hidden drivers"
+                    : `View hidden drivers (${Math.min(hiddenDriversCount, 10)})`}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
