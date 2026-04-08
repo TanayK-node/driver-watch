@@ -37,6 +37,8 @@ export default function DriverOverview() {
     try {
       // Hit your Render backend
       const response = await fetch("https://driver-watch.onrender.com/api/sync-drivers", {
+      // Use the Localhost URL:
+      // const response = await fetch("http://127.0.0.1:8000/api/sync-drivers", {
         method: "POST",
       });
 

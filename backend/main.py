@@ -24,7 +24,7 @@ mongo_uri = os.environ.get("MONGO_URI")
 if mongo_uri:
     try:
         mongo_client = MongoClient(mongo_uri)
-        mongo_db = mongo_client["your_db_name"] # Update with your DB name
+        mongo_db = mongo_client["tutemprod"] # Update with your DB name
         
         # Reference BOTH collections
         mongo_users_col = mongo_db["users"] 
@@ -58,61 +58,84 @@ except Exception as e:
     print(f"Warning: Could not load boundary file. Make sure {BOUNDARY_FILE_PATH} exists.")
     campus_boundary = None
 
+from fastapi import HTTPException
+from bson import ObjectId
+
 @app.post("/api/sync-drivers")
 async def sync_mongo_drivers_to_supabase():
     if mongo_client is None:
         raise HTTPException(status_code=500, detail="MongoDB connection not configured.")
 
     try:
-        # STEP 1: Find all vehicles registered to IITB
-        iitb_vehicles = list(mongo_vehicles_col.find({"organization": "IITB Campus Auto"}))
-        print(f"🔍 MONGO TEST: Found {len(iitb_vehicles)} vehicles for IITB in drivervehicledetails")
-        if not iitb_vehicles:
-            return {"status": "success", "message": "No IITB drivers found in MongoDB.", "synced_count": 0}
+        # STEP 1: Get IITB vehicles
+        iitb_vehicles = list(
+            mongo_vehicles_col.find({"organization": "IITB Campus Auto"})
+        )
+        print(f"🔍 Found {len(iitb_vehicles)} IITB vehicles")
 
-        # STEP 2: Extract the user IDs 
-        # (Assuming the field linking the vehicle to the user is called 'userId'. 
-        # Change 'userId' below if your MongoDB uses 'user_id' or simply 'user')
+        if not iitb_vehicles:
+            return {
+                "status": "success",
+                "message": "No IITB drivers found in MongoDB.",
+                "synced_count": 0
+            }
+
+        # STEP 2: Convert driverId → ObjectId and build map
         target_user_ids = []
         vehicle_map = {}
-        
-        for vehicle in iitb_vehicles:
-            user_id = vehicle.get("userId") # <-- UPDATE THIS KEY IF NEEDED
-            if user_id:
-                target_user_ids.append(user_id)
-                # Store vehicle details in a map so we can combine it with the user data later
-                vehicle_map[str(user_id)] = vehicle
 
-        # STEP 3: Fetch the actual User profiles using those IDs
-        # The $in operator finds all users whose _id matches one in our target list
-        users = list(mongo_users_col.find({"_id": {"$in": target_user_ids}}))
-        print(f"🔍 MONGO TEST: Found {len(users)} matching user profiles in the users collection")
-        # STEP 4: Format the combined data for Supabase
+        for vehicle in iitb_vehicles:
+            driver_id = vehicle.get("driverId")
+
+            if not driver_id:
+                continue
+
+            try:
+                obj_id = ObjectId(driver_id)  # 🔥 FIXED
+                target_user_ids.append(obj_id)
+                vehicle_map[str(obj_id)] = vehicle  # map using string for later lookup
+            except Exception as e:
+                print(f"⚠️ Invalid ObjectId: {driver_id}")
+                continue
+
+        if not target_user_ids:
+            return {
+                "status": "success",
+                "message": "No valid driver IDs found.",
+                "synced_count": 0
+            }
+
+        # STEP 3: Fetch matching users
+        users = list(
+            mongo_users_col.find({"_id": {"$in": target_user_ids}})
+        )
+        print(f"🔍 Found {len(users)} matching users")
+
+        # STEP 4: Merge user + vehicle data
         supabase_payload = []
+
         for user in users:
             uid_str = str(user.get("_id"))
-            
-            # Grab the matching vehicle info we saved earlier
             vehicle_info = vehicle_map.get(uid_str, {})
 
             supabase_payload.append({
                 "driverId": uid_str,
                 "name": user.get("name", "Unknown Driver"),
                 "phone": user.get("phone", ""),
-                
-                # Data from the drivervehicledetails collection:
+
+                # vehicle data
                 "organization": vehicle_info.get("organization", "IITB Campus Auto"),
                 "vehicleClass": vehicle_info.get("vehicleClass", ""),
                 "vehicleMake": vehicle_info.get("vehicleMake", ""),
                 "vehicleModel": vehicle_info.get("vehicleModel", ""),
-                "vehicleRegistrationNo": vehicle_info.get("registrationNo", "")
+                "vehicleRegistrationNo": vehicle_info.get("vehicleRegistrationNo", "")  # ✅ FIXED
             })
 
-        # STEP 5: Push to Supabase using UPSERT
+        # STEP 5: Push to Supabase
         if supabase_payload:
-            supabase.table('drivers').upsert(
+            supabase.table("drivers").upsert(
                 supabase_payload,
-                on_conflict='driverId'
+                on_conflict="driverId"
             ).execute()
 
         return {
