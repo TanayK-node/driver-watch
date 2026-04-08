@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { KPICard } from "@/components/KPICard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -14,10 +15,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Users, UserCheck, UserX, CalendarIcon, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Users, UserCheck, UserX, CalendarIcon, AlertTriangle, ShieldCheck, Upload, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import AttendanceUpload from "./AttendanceUpload";
 
 export default function AttendanceDashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -164,7 +166,20 @@ export default function AttendanceDashboard() {
   const mismatchedTripsCount = analyzedAttendance.filter((a) => a.status === "mismatch").length;
 
   return (
-    <DashboardLayout title="Attendance Dashboard">
+    <DashboardLayout title="Attendance">
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="dashboard" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="upload" className="gap-2">
+            <Upload className="h-4 w-4" />
+            Upload Attendance
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard">
       <div className="space-y-6">
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-end">
@@ -304,6 +319,12 @@ export default function AttendanceDashboard() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="upload">
+          <AttendanceUpload />
+        </TabsContent>
+      </Tabs>
     </DashboardLayout>
   );
 }

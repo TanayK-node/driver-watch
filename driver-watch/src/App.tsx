@@ -12,7 +12,7 @@ import LandingPage from "./pages/LandingPage";
 import DriverOverview from "./pages/DriverOverview";
 import DriverDetail from "./pages/DriverDetail";
 import AttendanceDashboard from "./pages/AttendanceDashboard";
-import AttendanceUpload from "./pages/AttendanceUpload";
+
 import DriverAttendanceDetail from "./pages/DriverAttendanceDetail";
 import RouteAdherence from "./pages/RouteAdherence";
 import TripAnalytics from "./pages/TripAnalytics";
@@ -43,7 +43,7 @@ const App = () => (
           <Route path="/drivers" element={<Protected><DriverOverview /></Protected>} />
           <Route path="/driver/:id" element={<Protected><DriverDetail /></Protected>} />
           <Route path="/attendance" element={<Protected><AttendanceDashboard /></Protected>} />
-          <Route path="/attendance/upload" element={<Protected><AttendanceUpload /></Protected>} />
+          
           <Route path="/attendance/driver/:driverId" element={<Protected><DriverAttendanceDetail /></Protected>} />
           <Route path="/routes" element={<Protected><RouteAdherence /></Protected>} />
           <Route path="/trips" element={<Protected><TripAnalytics /></Protected>} />

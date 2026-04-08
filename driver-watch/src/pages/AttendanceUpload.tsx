@@ -316,12 +316,7 @@ export default function AttendanceUpload() {
   };
 
   return (
-    <DashboardLayout title="Attendance Uploads">
-      <div className="space-y-6 max-w-5xl">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Attendance Uploads</h1>
-          <p className="text-muted-foreground text-sm">Upload and process driver attendance records.</p>
-        </div>
+    <div className="space-y-6 max-w-5xl">
 
         <Tabs defaultValue="manual" className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -606,7 +601,6 @@ export default function AttendanceUpload() {
             <BulkGpsAttendance />
           </TabsContent>
         </Tabs>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }
