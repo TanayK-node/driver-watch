@@ -166,7 +166,20 @@ export default function AttendanceDashboard() {
   const mismatchedTripsCount = analyzedAttendance.filter((a) => a.status === "mismatch").length;
 
   return (
-    <DashboardLayout title="Attendance Dashboard">
+    <DashboardLayout title="Attendance">
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="dashboard" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="upload" className="gap-2">
+            <Upload className="h-4 w-4" />
+            Upload Attendance
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard">
       <div className="space-y-6">
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-end">
@@ -306,6 +319,12 @@ export default function AttendanceDashboard() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="upload">
+          <AttendanceUpload />
+        </TabsContent>
+      </Tabs>
     </DashboardLayout>
   );
 }
