@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Search, Palette, Building2, RefreshCw, LayoutGrid, List, Phone, Car } from "lucide-react";
+import { Users, Search, Palette, Building2, RefreshCw, LayoutGrid, List, Phone, Car, PaintBucket } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
