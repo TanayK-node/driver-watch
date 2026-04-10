@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,8 +63,11 @@ export default function DriverOverview() {
 
   const organizations = [...new Set(drivers.map((d) => d.organization).filter(Boolean))];
 
+  const getDriverColor = (driver: { color?: string | null; vehicleColor?: string | null }) =>
+    (driver.color ?? driver.vehicleColor ?? "unknown").toLowerCase().trim() || "unknown";
+
   const filtered = drivers.filter((d) => {
-    const driverColor = (d.vehicleColor ?? "").toLowerCase().trim();
+    const driverColor = getDriverColor(d);
     const matchSearch =
       (d.name?.toLowerCase() || "").includes(search.toLowerCase()) ||
       d.driverId.toLowerCase().includes(search.toLowerCase()) ||
@@ -98,13 +101,19 @@ export default function DriverOverview() {
     ? [...normalVisibleDrivers, ...hiddenDrivers.slice(0, 10)]
     : normalVisibleDrivers;
   const hiddenDriversCount = hiddenDrivers.length;
+  const hiddenDriversPreview = hiddenDrivers.slice(0, 10);
 
   const colorCounts = drivers.reduce((acc, d) => {
-    const c = (d.color ?? "unknown").toLowerCase().trim() || "unknown";
+    const c = getDriverColor(d);
     acc[c] = (acc[c] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-  const colorSummary = Object.entries(colorCounts).map(([c, n]) => `${c}: ${n}`).join(", ");
+  const colorDriverCount =
+    (colorCounts.green ?? 0) + (colorCounts.yellow ?? 0) + (colorCounts.blue ?? 0);
+  const colorSummary = useMemo(
+    () => `Green: ${colorCounts.green ?? 0} drivers | Yellow: ${colorCounts.yellow ?? 0} drivers | Blue: ${colorCounts.blue ?? 0} drivers`,
+    [colorCounts.green, colorCounts.yellow, colorCounts.blue]
+  );
   const vehicleClasses = [...new Set(drivers.map((d) => d.vehicleClass).filter(Boolean))];
 
   return (
@@ -116,7 +125,13 @@ export default function DriverOverview() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           <KPICard title="Total Drivers" value={isLoading ? "..." : drivers.length} icon={Users} />
-          <KPICard title="Color Summary" value={isLoading ? "..." : colorSummary} icon={PaintBucket} accent="success" />
+          <KPICard
+            title="Color Summary"
+            value={isLoading ? "..." : colorDriverCount}
+            icon={PaintBucket}
+            accent="success"
+            subtitle={isLoading ? "..." : colorSummary}
+          />
           <KPICard title="Organizations" value={isLoading ? "..." : organizations.length} icon={Building2} />
         </div>
 
@@ -204,13 +219,13 @@ export default function DriverOverview() {
                       key={d.driverId}
                       className={cn(
                         "cursor-pointer",
-                        (d.color ?? "").toLowerCase().trim() === "yellow" &&
+                        getDriverColor(d) === "yellow" &&
                           "bg-yellow-50/70 hover:bg-yellow-100/70 dark:bg-yellow-950/20 dark:hover:bg-yellow-950/35",
-                        (d.color ?? "").toLowerCase().trim() === "green" &&
+                        getDriverColor(d) === "green" &&
                           "bg-emerald-50/70 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35",
-                        (d.color ?? "").toLowerCase().trim() === "blue" &&
+                        getDriverColor(d) === "blue" &&
                           "bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/35",
-                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
+                        !["yellow", "green", "blue"].includes(getDriverColor(d)) &&
                           "hover:bg-muted/50"
                       )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
@@ -240,13 +255,13 @@ export default function DriverOverview() {
                       key={d.driverId}
                       className={cn(
                         "cursor-pointer hover:shadow-md transition-all",
-                        (d.color ?? "").toLowerCase().trim() === "yellow" &&
+                        getDriverColor(d) === "yellow" &&
                           "border-yellow-300 bg-yellow-50/70 hover:border-yellow-400 dark:border-yellow-700 dark:bg-yellow-950/20",
-                        (d.color ?? "").toLowerCase().trim() === "green" &&
+                        getDriverColor(d) === "green" &&
                           "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-950/20",
-                        (d.color ?? "").toLowerCase().trim() === "blue" &&
+                        getDriverColor(d) === "blue" &&
                           "border-blue-300 bg-blue-50/70 hover:border-blue-400 dark:border-blue-700 dark:bg-blue-950/20",
-                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
+                        !["yellow", "green", "blue"].includes(getDriverColor(d)) &&
                           "hover:border-primary/30"
                       )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
@@ -318,13 +333,13 @@ export default function DriverOverview() {
                           key={`hidden-${d.driverId}`}
                           className={cn(
                             "cursor-pointer",
-                            (d.color ?? "").toLowerCase().trim() === "yellow" &&
+                            getDriverColor(d) === "yellow" &&
                               "bg-yellow-50/70 hover:bg-yellow-100/70 dark:bg-yellow-950/20 dark:hover:bg-yellow-950/35",
-                            (d.color ?? "").toLowerCase().trim() === "green" &&
+                            getDriverColor(d) === "green" &&
                               "bg-emerald-50/70 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35",
-                            (d.color ?? "").toLowerCase().trim() === "blue" &&
+                            getDriverColor(d) === "blue" &&
                               "bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/35",
-                            !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
+                            !["yellow", "green", "blue"].includes(getDriverColor(d)) &&
                               "hover:bg-muted/50"
                           )}
                           onClick={() => navigate(`/driver/${d.driverId}`)}
@@ -343,13 +358,13 @@ export default function DriverOverview() {
                         key={`hidden-card-${d.driverId}`}
                         className={cn(
                           "cursor-pointer hover:shadow-md transition-all",
-                          (d.color ?? "").toLowerCase().trim() === "yellow" &&
+                          getDriverColor(d) === "yellow" &&
                             "border-yellow-300 bg-yellow-50/70 hover:border-yellow-400 dark:border-yellow-700 dark:bg-yellow-950/20",
-                          (d.color ?? "").toLowerCase().trim() === "green" &&
+                          getDriverColor(d) === "green" &&
                             "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-950/20",
-                          (d.color ?? "").toLowerCase().trim() === "blue" &&
+                          getDriverColor(d) === "blue" &&
                             "border-blue-300 bg-blue-50/70 hover:border-blue-400 dark:border-blue-700 dark:bg-blue-950/20",
-                          !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
+                          !["yellow", "green", "blue"].includes(getDriverColor(d)) &&
                             "hover:border-primary/30"
                         )}
                         onClick={() => navigate(`/driver/${d.driverId}`)}
