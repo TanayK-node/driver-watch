@@ -421,13 +421,29 @@ export default function AttendanceUpload() {
             {rawRows.length > 0 && (
               <div className="md:col-span-2">
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
+                  <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-3">
                     <CardTitle className="text-base">
                       Parsed {rawRows.length} Records
                     </CardTitle>
-                    <Button onClick={autoMatch} className="gap-2">
-                      <Wand2 className="h-4 w-4" /> Auto-Match & Continue
-                    </Button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Date for all:</label>
+                        <Input
+                          type="date"
+                          value={rawRows[0]?.date || ""}
+                          onChange={(e) => {
+                            const newDate = e.target.value;
+                            setRawRows((prev) =>
+                              prev.map((row) => ({ ...row, date: newDate }))
+                            );
+                          }}
+                          className="h-8 w-40"
+                        />
+                      </div>
+                      <Button onClick={autoMatch} className="gap-2">
+                        <Wand2 className="h-4 w-4" /> Auto-Match & Continue
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <Table>
@@ -443,20 +459,7 @@ export default function AttendanceUpload() {
                      {rawRows.slice(0, 10).map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{r.rawName}</TableCell>
-                            <TableCell>
-                              <Input
-                                type="date"
-                                value={r.date}
-                                onChange={(e) => {
-                                  setRawRows((prev) =>
-                                    prev.map((row, idx) =>
-                                      idx === i ? { ...row, date: e.target.value } : row
-                                    )
-                                  );
-                                }}
-                                className="h-8 w-36"
-                              />
-                            </TableCell>
+                            <TableCell>{r.date}</TableCell>
                             <TableCell>{r.inTime}</TableCell>
                             <TableCell>{r.outTime || <span className="text-muted-foreground">—</span>}</TableCell>
                           </TableRow>
