@@ -97,9 +97,7 @@ export default function DriverOverview() {
   const normalVisibleDrivers = filtered.filter(
     (d) => !featuredDriverNames.has((d.name ?? "").toLowerCase().trim())
   );
-  const visibleDrivers = showHiddenDrivers
-    ? [...normalVisibleDrivers, ...hiddenDrivers.slice(0, 10)]
-    : normalVisibleDrivers;
+  const visibleDrivers = normalVisibleDrivers;
   const hiddenDriversCount = hiddenDrivers.length;
   const hiddenDriversPreview = hiddenDrivers.slice(0, 10);
 
@@ -308,8 +306,8 @@ export default function DriverOverview() {
                   onClick={() => setShowHiddenDrivers((prev) => !prev)}
                 >
                   {showHiddenDrivers
-                    ? "Hide hidden drivers"
-                    : `View hidden drivers (${Math.min(hiddenDriversCount, 10)})`}
+                    ? "Hide Tutem drivers"
+                    : `View Tutem drivers (${Math.min(hiddenDriversCount, 10)})`}
                 </Button>
               </div>
             )}
