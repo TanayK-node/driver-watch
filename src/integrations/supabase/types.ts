@@ -66,12 +66,19 @@ export type Database = {
       }
       drivers: {
         Row: {
+          address: string | null
+          color: string | null
           created_at: string | null
+          dob: string | null
           driverId: string
           driverLicenseNo: string | null
+          email: string | null
+          gender: string | null
+          image: string | null
           name: string | null
           organization: string | null
           phone: string | null
+          rating: number | null
           vehicleClass: string | null
           vehicleColor: string | null
           vehicleMake: string | null
@@ -79,12 +86,19 @@ export type Database = {
           vehicleRegistrationNo: string | null
         }
         Insert: {
+          address?: string | null
+          color?: string | null
           created_at?: string | null
+          dob?: string | null
           driverId: string
           driverLicenseNo?: string | null
+          email?: string | null
+          gender?: string | null
+          image?: string | null
           name?: string | null
           organization?: string | null
           phone?: string | null
+          rating?: number | null
           vehicleClass?: string | null
           vehicleColor?: string | null
           vehicleMake?: string | null
@@ -92,12 +106,19 @@ export type Database = {
           vehicleRegistrationNo?: string | null
         }
         Update: {
+          address?: string | null
+          color?: string | null
           created_at?: string | null
+          dob?: string | null
           driverId?: string
           driverLicenseNo?: string | null
+          email?: string | null
+          gender?: string | null
+          image?: string | null
           name?: string | null
           organization?: string | null
           phone?: string | null
+          rating?: number | null
           vehicleClass?: string | null
           vehicleColor?: string | null
           vehicleMake?: string | null
