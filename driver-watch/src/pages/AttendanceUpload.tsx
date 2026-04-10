@@ -314,6 +314,7 @@ export default function AttendanceUpload() {
     setRawRows([]);
     setMappedRows([]);
     setPasteData("");
+    setOverrideDate("");
   };
 
   return (
