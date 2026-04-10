@@ -202,7 +202,17 @@ export default function DriverOverview() {
                   {visibleDrivers.map((d) => (
                     <TableRow
                       key={d.driverId}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={cn(
+                        "cursor-pointer",
+                        (d.color ?? "").toLowerCase().trim() === "yellow" &&
+                          "bg-yellow-50/70 hover:bg-yellow-100/70 dark:bg-yellow-950/20 dark:hover:bg-yellow-950/35",
+                        (d.color ?? "").toLowerCase().trim() === "green" &&
+                          "bg-emerald-50/70 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35",
+                        (d.color ?? "").toLowerCase().trim() === "blue" &&
+                          "bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/35",
+                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
+                          "hover:bg-muted/50"
+                      )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
                     >
                       <TableCell className="font-medium lg:text-base">{d.name || "—"}</TableCell>
