@@ -88,6 +88,7 @@ export default function AttendanceUpload() {
   const [mappedRows, setMappedRows] = useState<MappedRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [overrideDate, setOverrideDate] = useState("");
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["drivers-list"],
