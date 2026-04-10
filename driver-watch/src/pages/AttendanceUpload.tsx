@@ -153,6 +153,16 @@ export default function AttendanceUpload() {
   return rows;
 };
 
+  const applyDateToAll = () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(overrideDate)) {
+      toast.error("Please select a valid date first");
+      return;
+    }
+
+    setRawRows((prev) => prev.map((row) => ({ ...row, date: overrideDate })));
+    toast.success(`Applied ${overrideDate} to ${rawRows.length} row(s)`);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -165,6 +175,7 @@ export default function AttendanceUpload() {
         return;
       }
       setRawRows(rows);
+      setOverrideDate(/^\d{4}-\d{2}-\d{2}$/.test(rows[0]?.date ?? "") ? rows[0].date : "");
       toast.success(`Parsed ${rows.length} rows`);
     };
     reader.readAsText(file);
@@ -177,6 +188,7 @@ export default function AttendanceUpload() {
       return;
     }
     setRawRows(rows);
+    setOverrideDate(/^\d{4}-\d{2}-\d{2}$/.test(rows[0]?.date ?? "") ? rows[0].date : "");
     toast.success(`Parsed ${rows.length} rows`);
   };
 
@@ -223,6 +235,7 @@ export default function AttendanceUpload() {
       }
 
       setRawRows(rows);
+      setOverrideDate(/^\d{4}-\d{2}-\d{2}$/.test(rows[0]?.date ?? "") ? rows[0].date : "");
       toast.success(`AI extracted ${rows.length} records from photo`);
     } catch (err: any) {
       console.error("AI extraction error:", err);
@@ -432,16 +445,18 @@ export default function AttendanceUpload() {
                         <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Date for all:</label>
                         <Input
                           type="date"
-                          value={overrideDate || rawRows[0]?.date || ""}
-                          onChange={(e) => {
-                            const newDate = e.target.value;
-                            setOverrideDate(newDate);
-                            setRawRows((prev) =>
-                              prev.map((row) => ({ ...row, date: newDate }))
-                            );
-                          }}
+                          value={overrideDate}
+                          onChange={(e) => setOverrideDate(e.target.value)}
                           className="h-8 w-40"
                         />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={applyDateToAll}
+                          disabled={!overrideDate || rawRows.length === 0}
+                        >
+                          Apply to all
+                        </Button>
                       </div>
                       <Button onClick={autoMatch} className="gap-2">
                         <Wand2 className="h-4 w-4" /> Auto-Match & Continue
