@@ -99,6 +99,12 @@ export default function DriverOverview() {
     : normalVisibleDrivers;
   const hiddenDriversCount = hiddenDrivers.length;
 
+  const colorCounts = drivers.reduce((acc, d) => {
+    const c = (d.color ?? "unknown").toLowerCase().trim() || "unknown";
+    acc[c] = (acc[c] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const colorSummary = Object.entries(colorCounts).map(([c, n]) => `${c}: ${n}`).join(", ");
   const vehicleClasses = [...new Set(drivers.map((d) => d.vehicleClass).filter(Boolean))];
 
   return (
