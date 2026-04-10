@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Search, Palette, Building2, RefreshCw, LayoutGrid, List, Phone, Car } from "lucide-react";
+import { Users, Search, Palette, Building2, RefreshCw, LayoutGrid, List, Phone, Car, PaintBucket } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,12 @@ export default function DriverOverview() {
     : normalVisibleDrivers;
   const hiddenDriversCount = hiddenDrivers.length;
 
+  const colorCounts = drivers.reduce((acc, d) => {
+    const c = (d.color ?? "unknown").toLowerCase().trim() || "unknown";
+    acc[c] = (acc[c] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const colorSummary = Object.entries(colorCounts).map(([c, n]) => `${c}: ${n}`).join(", ");
   const vehicleClasses = [...new Set(drivers.map((d) => d.vehicleClass).filter(Boolean))];
 
   return (
@@ -110,7 +116,7 @@ export default function DriverOverview() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           <KPICard title="Total Drivers" value={isLoading ? "..." : drivers.length} icon={Users} />
-          <KPICard title="Vehicle Types" value={isLoading ? "..." : vehicleClasses.length} icon={Car} accent="success" />
+          <KPICard title="Color Summary" value={isLoading ? "..." : colorSummary} icon={PaintBucket} accent="success" />
           <KPICard title="Organizations" value={isLoading ? "..." : organizations.length} icon={Building2} />
         </div>
 
@@ -196,7 +202,17 @@ export default function DriverOverview() {
                   {visibleDrivers.map((d) => (
                     <TableRow
                       key={d.driverId}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={cn(
+                        "cursor-pointer",
+                        (d.color ?? "").toLowerCase().trim() === "yellow" &&
+                          "bg-yellow-50/70 hover:bg-yellow-100/70 dark:bg-yellow-950/20 dark:hover:bg-yellow-950/35",
+                        (d.color ?? "").toLowerCase().trim() === "green" &&
+                          "bg-emerald-50/70 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35",
+                        (d.color ?? "").toLowerCase().trim() === "blue" &&
+                          "bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/35",
+                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
+                          "hover:bg-muted/50"
+                      )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
                     >
                       <TableCell className="font-medium lg:text-base">{d.name || "—"}</TableCell>
@@ -228,7 +244,9 @@ export default function DriverOverview() {
                           "border-yellow-300 bg-yellow-50/70 hover:border-yellow-400 dark:border-yellow-700 dark:bg-yellow-950/20",
                         (d.color ?? "").toLowerCase().trim() === "green" &&
                           "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-950/20",
-                        !["yellow", "green"].includes((d.color ?? "").toLowerCase().trim()) &&
+                        (d.color ?? "").toLowerCase().trim() === "blue" &&
+                          "border-blue-300 bg-blue-50/70 hover:border-blue-400 dark:border-blue-700 dark:bg-blue-950/20",
+                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
                           "hover:border-primary/30"
                       )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
