@@ -116,7 +116,7 @@ export default function DriverOverview() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           <KPICard title="Total Drivers" value={isLoading ? "..." : drivers.length} icon={Users} />
-          <KPICard title="Vehicle Types" value={isLoading ? "..." : vehicleClasses.length} icon={Car} accent="success" />
+          <KPICard title="Color Summary" value={isLoading ? "..." : colorSummary} icon={PaintBucket} accent="success" />
           <KPICard title="Organizations" value={isLoading ? "..." : organizations.length} icon={Building2} />
         </div>
 
