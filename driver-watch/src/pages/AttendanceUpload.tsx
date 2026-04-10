@@ -431,9 +431,10 @@ export default function AttendanceUpload() {
                         <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Date for all:</label>
                         <Input
                           type="date"
-                          value={rawRows[0]?.date || ""}
+                          value={overrideDate || rawRows[0]?.date || ""}
                           onChange={(e) => {
                             const newDate = e.target.value;
+                            setOverrideDate(newDate);
                             setRawRows((prev) =>
                               prev.map((row) => ({ ...row, date: newDate }))
                             );
