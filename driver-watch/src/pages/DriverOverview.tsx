@@ -244,7 +244,9 @@ export default function DriverOverview() {
                           "border-yellow-300 bg-yellow-50/70 hover:border-yellow-400 dark:border-yellow-700 dark:bg-yellow-950/20",
                         (d.color ?? "").toLowerCase().trim() === "green" &&
                           "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-950/20",
-                        !["yellow", "green"].includes((d.color ?? "").toLowerCase().trim()) &&
+                        (d.color ?? "").toLowerCase().trim() === "blue" &&
+                          "border-blue-300 bg-blue-50/70 hover:border-blue-400 dark:border-blue-700 dark:bg-blue-950/20",
+                        !["yellow", "green", "blue"].includes((d.color ?? "").toLowerCase().trim()) &&
                           "hover:border-primary/30"
                       )}
                       onClick={() => navigate(`/driver/${d.driverId}`)}
