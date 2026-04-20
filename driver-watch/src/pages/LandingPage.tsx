@@ -10,22 +10,22 @@ const features = [
   {
     icon: Gauge,
     title: "Automated Monitoring",
-    description: "Track movement and attendance behavior with less manual oversight and faster review cycles.",
+    description: "Monitor movement, attendance with minimal oversight.",
   },
   {
     icon: FileSearch,
     title: "Data-Driven Insights",
-    description: "Turn trip logs and GPS records into decision-ready signals that are easy to scan at a glance.",
+    description: "Convert trip logs and GPS data into clear, scannable insights",
   },
   {
     icon: BarChart3,
     title: "Performance Analytics",
-    description: "Compare operational patterns over time and quickly spot inconsistencies across the fleet.",
+    description: "Compare patterns over time and quickly spot fleet inconsistencies",
   },
   {
     icon: Route,
     title: "Route Intelligence",
-    description: "Review route adherence, detect deviations, and prioritize the trips that need attention first.",
+    description: "Review routes, detect deviations, prioritize critical trips",
   },
 ];
 
@@ -56,17 +56,17 @@ export default function LandingPage() {
 
   return (
     <DashboardLayout title="TUTEM IQ">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto w-full max-w-[1800px] space-y-6 xl:space-y-8 2xl:space-y-10">
         <section>
           <Card>
-            <CardContent className="p-6 md:p-4">
-              <div className="grid gap-6 lg:grid-cols-[2fr_1.5fr]">
+            <CardContent className="p-6 md:p-8 xl:p-10 2xl:p-12">
+              <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr] xl:gap-8 2xl:grid-cols-[1.35fr_1fr] 2xl:gap-10">
                 <div className="space-y-4">
                   {/* <p className="text-sm font-medium text-primary">Driver Monitoring and Operational Intelligence</p> */}
                   <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
                     
                   </h1>
-                  <p className="max-w-xl text-sm text-muted-foreground md:text-base">
+                  <p className="max-w-3xl text-base leading-7 md:text-lg xl:text-xl xl:leading-8">
                     TUTEM IQ Campus is a smart mobility intelligence dashboard designed to monitor and analyze informal paratransit systems operating within a controlled campus environment. The platform integrates real-time GPS data from registered auto-rickshaw drivers to provide actionable insights for operational monitoring, security oversight, and data-driven decision-making. 
 
                   </p>
@@ -88,7 +88,11 @@ export default function LandingPage() {
 
                 <div className="space-y-4">
                   <div className="overflow-hidden rounded-xl border bg-muted/20">
-                    <img src={heroOverviewImage} alt="Dashboard overview preview" className="h-44 w-full object-cover md:h-52" />
+                    <img
+                      src={heroOverviewImage}
+                      alt="Dashboard overview preview"
+                      className="h-56 w-full object-cover md:h-64 xl:h-72 2xl:h-80"
+                    />
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
@@ -133,9 +137,9 @@ export default function LandingPage() {
         {/* s */}
 
 
-        <section className="space-y-3">
-          <h2 className="text-2xl font-semibold tracking-tight">Features</h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="space-y-3 xl:space-y-4">
+          <h2 className="text-2xl font-semibold tracking-tight xl:text-3xl">Features</h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:gap-6">
             {features.map((feature) => {
               const Icon = feature.icon;
               return (
@@ -153,9 +157,9 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-2xl font-semibold tracking-tight">Data Flow</h2>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <section className="space-y-3 xl:space-y-4">
+          <h2 className="text-2xl font-semibold tracking-tight xl:text-3xl">Data Flow</h2>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:gap-5">
             {workflow.map((item) => (
               <Card key={item.step}>
                 <CardContent className="space-y-2 p-5">

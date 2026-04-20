@@ -52,7 +52,7 @@ export function DashboardLayout({ children, title }: { children: React.ReactNode
               <img src={tutemLogo} alt="TUTEM home" className="h-10 w-10 shrink-0 object-contain" />
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-semibold text-foreground">{title}</h1>
-                <p className="hidden text-xs text-muted-foreground sm:block">Driverdash control center</p>
+                {/* <p className="hidden text-xs text-muted-foreground sm:block">Intelligence Dashboard</p> */}
               </div>
             </NavLink>
             <nav className="hidden items-center gap-1 lg:flex">
