@@ -295,7 +295,53 @@ export default function AttendanceUpload() {
   const unmappedCount = mappedRows.filter((r) => !r.driverId).length;
   const missingCheckout = mappedRows.filter((r) => !r.outTime).length;
 
-  const handleSave = async () => {
+  const openAddDriver = (rowIndex: number | null) => {
+    const prefillName = rowIndex !== null ? mappedRows[rowIndex]?.rawName ?? "" : "";
+    setAddDriverForRowIndex(rowIndex);
+    setNewDriver({
+      driverId: "",
+      name: prefillName,
+      phone: "",
+      vehicleRegistrationNo: "",
+      color: "",
+    });
+    setAddDriverOpen(true);
+  };
+
+  const handleCreateDriver = async () => {
+    if (!newDriver.driverId.trim() || !newDriver.name.trim()) {
+      toast.error("Driver ID and Name are required");
+      return;
+    }
+    setCreatingDriver(true);
+    const { error } = await supabase.from("drivers").insert({
+      driverId: newDriver.driverId.trim(),
+      name: newDriver.name.trim(),
+      phone: newDriver.phone.trim() || null,
+      vehicleRegistrationNo: newDriver.vehicleRegistrationNo.trim() || null,
+      color: newDriver.color.trim() || null,
+    });
+    setCreatingDriver(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Driver ${newDriver.name} added`);
+    await queryClient.invalidateQueries({ queryKey: ["drivers-list"] });
+    // Auto-map the row that triggered this
+    if (addDriverForRowIndex !== null) {
+      const idx = addDriverForRowIndex;
+      const created = { driverId: newDriver.driverId.trim(), name: newDriver.name.trim() };
+      setMappedRows((prev) =>
+        prev.map((r, i) =>
+          i === idx
+            ? { ...r, driverId: created.driverId, driverName: created.name, matchStatus: "manual" as const }
+            : r
+        )
+      );
+    }
+    setAddDriverOpen(false);
+  };
     const valid = mappedRows.filter((r) => r.driverId);
     if (valid.length === 0) {
       toast.error("No mapped records to save");
