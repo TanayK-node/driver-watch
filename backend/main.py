@@ -213,7 +213,7 @@ async def fetch_mongo_drivers():
 
 # Add these collections below your existing mongo_users_col and mongo_vehicles_col
 mongo_location_col = mongo_db["driverlocationstatuses"]
-mongo_route_col = mongo_db["VehicleRouteIITB"]
+mongo_route_col = mongo_db["vehiclerouteiitbs"]
 
 # IITB Campus Polygon for Ray-Casting
 IITB_POLYGON = [

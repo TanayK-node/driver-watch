@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +21,12 @@ const autoIcon = new L.Icon({
     iconUrl: 'https://tutem.in/auto.png',
     iconSize: [32, 32],
     iconAnchor: [16, 16]
+});
+
+const selectedAutoIcon = new L.Icon({
+    iconUrl: 'https://tutem.in/auto.png',
+    iconSize: [44, 44],
+    iconAnchor: [22, 22]
 });
 
 const routeColors: Record<string, string> = {
@@ -72,6 +78,9 @@ export default function LiveDashboard() {
     const [drivers, setDrivers] = useState<Driver[]>([]);
     const [totalRegistered, setTotalRegistered] = useState<number>(0);
     const [error, setError] = useState<string | null>(null);
+    const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+    const mapRef = useRef<L.Map | null>(null);
+    const markerRefs = useRef<Record<string, L.Marker | null>>({});
 
     const fetchDashboardData = async () => {
         try {
@@ -117,6 +126,20 @@ export default function LiveDashboard() {
         };
     }, []);
 
+    const focusDriverOnMap = (driver: Driver) => {
+        setSelectedDriverId(driver.driverId);
+
+        if (mapRef.current) {
+            const targetZoom = Math.max(mapRef.current.getZoom(), 17);
+            mapRef.current.flyTo([driver.latitude, driver.longitude], targetZoom, { duration: 0.8 });
+        }
+
+        const marker = markerRefs.current[driver.driverId];
+        if (marker) {
+            marker.openPopup();
+        }
+    };
+
     const G = drivers.filter((d) => getDriverColorKey(d) === 'green').length;
     const Y = drivers.filter((d) => getDriverColorKey(d) === 'yellow').length;
     const B = drivers.filter((d) => getDriverColorKey(d) === 'blue').length;
@@ -138,6 +161,9 @@ export default function LiveDashboard() {
                         center={[19.13238, 72.91732]} 
                         zoom={16} 
                         className="h-full w-full"
+                        ref={(mapInstance) => {
+                            mapRef.current = mapInstance;
+                        }}
                     >
                         <TileLayer 
                             attribution='&copy; OpenStreetMap'
@@ -147,7 +173,10 @@ export default function LiveDashboard() {
                             <Marker 
                                 key={driver.driverId} 
                                 position={[driver.latitude, driver.longitude]} 
-                                icon={autoIcon}
+                                icon={selectedDriverId === driver.driverId ? selectedAutoIcon : autoIcon}
+                                ref={(markerInstance) => {
+                                    markerRefs.current[driver.driverId] = markerInstance;
+                                }}
                             >
                                 <Popup>
                                     <div className="text-center">
@@ -203,7 +232,8 @@ export default function LiveDashboard() {
                         {drivers.map(d => (
                             <div 
                                 key={d.driverId} 
-                                className="p-3 rounded-md shadow-sm flex items-center justify-between border border-gray-100 transition-all hover:shadow-md"
+                                onClick={() => focusDriverOnMap(d)}
+                                className={`p-3 rounded-md shadow-sm flex items-center justify-between border transition-all hover:shadow-md cursor-pointer ${selectedDriverId === d.driverId ? 'border-blue-500 ring-2 ring-blue-200 shadow-md' : 'border-gray-100'}`}
                                 style={{ backgroundColor: getDriverColorValue(d) }}
                             >
                                 <div className="flex flex-col">
