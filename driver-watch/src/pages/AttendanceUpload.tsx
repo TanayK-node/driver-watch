@@ -342,6 +342,8 @@ export default function AttendanceUpload() {
     }
     setAddDriverOpen(false);
   };
+
+  const handleSave = async () => {
     const valid = mappedRows.filter((r) => r.driverId);
     if (valid.length === 0) {
       toast.error("No mapped records to save");
