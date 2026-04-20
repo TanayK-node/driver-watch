@@ -93,6 +93,17 @@ export default function AttendanceUpload() {
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [overrideDate, setOverrideDate] = useState("");
+  const [addDriverOpen, setAddDriverOpen] = useState(false);
+  const [addDriverForRowIndex, setAddDriverForRowIndex] = useState<number | null>(null);
+  const [newDriver, setNewDriver] = useState({
+    driverId: "",
+    name: "",
+    phone: "",
+    vehicleRegistrationNo: "",
+    color: "",
+  });
+  const [creatingDriver, setCreatingDriver] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["drivers-list"],
