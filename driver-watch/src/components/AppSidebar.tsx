@@ -1,4 +1,4 @@
-import { Home, Users, ClipboardCheck, Route, BarChart3, Map, LogOut } from "lucide-react";
+import { Home, Users, ClipboardCheck, Route, BarChart3, Map, Monitor, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,10 +20,11 @@ const items = [
   { title: "Home", url: "/", icon: Home },
   { title: "Drivers", url: "/drivers", icon: Users },
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
+  { title: "Live Dashboard", url: "/live-dashboard", icon: Monitor },
   
   { title: "Route Adherence", url: "/routes", icon: Route },
-  { title: "Trip Analytics", url: "/trips", icon: BarChart3 },
-  { title: "Live Map", url: "/map", icon: Map },
+  // { title: "Trip Analytics", url: "/trips", icon: BarChart3 },
+  // { title: "Live Map", url: "/map", icon: Map },
 ];
 
 export function AppSidebar() {

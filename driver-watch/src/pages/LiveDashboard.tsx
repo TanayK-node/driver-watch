@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
+import { DashboardLayout } from '@/components/DashboardLayout';
 import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -170,18 +171,19 @@ export default function LiveDashboard() {
     const B = drivers.filter((d) => getDriverColorKey(d) === 'blue').length;
 
     return (
-        <div className="flex flex-col h-screen bg-gray-50">
-            {/* Header */}
-            <header className="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center z-10 relative">
-                <h1 className="text-xl font-bold tracking-tight">IIT Bombay Campus Auto Service Dashboard</h1>
-                {error && <span className="text-red-400 text-sm">{error}</span>}
-            </header>
+        <DashboardLayout title="Live Dashboard">
+            <div className="space-y-3">
+                <div className="rounded-lg border bg-card px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-base font-semibold text-foreground">IIT Bombay Campus Auto Service Dashboard</h2>
+                        {error && <span className="text-sm text-destructive">{error}</span>}
+                    </div>
+                </div>
 
-            {/* Main Content */}
-            <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
-                
-                {/* Left Side: Map */}
-                <div className="flex-1 relative h-[50vh] md:h-full z-0">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]">
+                    {/* Left Side: Map */}
+                    <div className="relative z-0 overflow-hidden rounded-xl border bg-card">
+                        <div className="h-[56vh] min-h-[340px] lg:h-[calc(100vh-15rem)]">
                     <MapContainer 
                         center={[19.13238, 72.91732]} 
                         zoom={16} 
@@ -212,20 +214,21 @@ export default function LiveDashboard() {
                             </Marker>
                         ))}
                     </MapContainer>
+                        </div>
 
                     <button 
                         onClick={fetchDashboardData}
-                        className="absolute bottom-6 right-6 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-green-700 transition-colors z-[1000] flex items-center gap-2"
+                        className="absolute bottom-4 right-4 rounded-full bg-green-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-green-700 z-[1000] flex items-center gap-2"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                         Refresh Map
                     </button>
-                </div>
+                    </div>
 
-                {/* Right Side: Driver List Panel */}
-                <div className="w-full md:w-1/3 bg-white flex flex-col border-l border-gray-200 shadow-xl z-10">
+                    {/* Right Side: Driver List Panel */}
+                    <div className="flex min-h-[320px] flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
                     {/* Stats Card */}
-                    <div className="p-5 border-b border-gray-200 bg-gray-50">
+                    <div className="border-b bg-muted/30 p-4">
                         <div className="flex justify-between items-center mb-3">
                             <h2 className="font-semibold text-lg text-gray-800">Live Status</h2>
                             <button 
@@ -247,13 +250,13 @@ export default function LiveDashboard() {
                     </div>
 
                     {/* Table Headers */}
-                    <div className="flex bg-gray-100 p-3 border-b border-gray-200 font-semibold text-sm text-gray-600 uppercase tracking-wider">
+                    <div className="flex border-b bg-muted/40 p-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                         <div className="w-3/4 pl-2">Name</div>
                         <div className="w-1/4 text-center">Booking</div>
                     </div>
 
                     {/* Scrollable List */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    <div className="flex-1 space-y-2 overflow-y-auto p-3">
                         {drivers.map(d => (
                             <div 
                                 key={d.driverId} 
@@ -284,8 +287,9 @@ export default function LiveDashboard() {
                             </div>
                         )}
                     </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </DashboardLayout>
     );
 }
