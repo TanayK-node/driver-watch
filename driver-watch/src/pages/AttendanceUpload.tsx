@@ -710,6 +710,77 @@ export default function AttendanceUpload() {
             <BulkGpsAttendance />
           </TabsContent>
         </Tabs>
+
+        <Dialog open={addDriverOpen} onOpenChange={setAddDriverOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add new driver</DialogTitle>
+              <DialogDescription>
+                Create a driver record in the dashboard. This stores the driver in Supabase only — your MongoDB source is not modified.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 py-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="d-id">Driver ID *</Label>
+                <Input
+                  id="d-id"
+                  placeholder="e.g. DRV1042"
+                  value={newDriver.driverId}
+                  onChange={(e) => setNewDriver((p) => ({ ...p, driverId: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="d-name">Name *</Label>
+                <Input
+                  id="d-name"
+                  placeholder="Driver full name"
+                  value={newDriver.name}
+                  onChange={(e) => setNewDriver((p) => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="d-phone">Phone</Label>
+                  <Input
+                    id="d-phone"
+                    placeholder="Optional"
+                    value={newDriver.phone}
+                    onChange={(e) => setNewDriver((p) => ({ ...p, phone: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="d-veh">Vehicle Reg. No</Label>
+                  <Input
+                    id="d-veh"
+                    placeholder="Optional"
+                    value={newDriver.vehicleRegistrationNo}
+                    onChange={(e) =>
+                      setNewDriver((p) => ({ ...p, vehicleRegistrationNo: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="d-color">Color</Label>
+                <Input
+                  id="d-color"
+                  placeholder="e.g. yellow, green, blue"
+                  value={newDriver.color}
+                  onChange={(e) => setNewDriver((p) => ({ ...p, color: e.target.value }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddDriverOpen(false)} disabled={creatingDriver}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateDriver} disabled={creatingDriver} className="gap-2">
+                {creatingDriver ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                {creatingDriver ? "Adding..." : "Add Driver"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }
