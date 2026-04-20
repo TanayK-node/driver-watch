@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // very impeotnat
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
@@ -14,3 +15,4 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "./src") },
   },
 });
+// 
