@@ -568,6 +568,10 @@ export default function AttendanceUpload() {
                 <Button variant="outline" size="sm" onClick={() => setStep("upload")}>
                   Back
                 </Button>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => openAddDriver(null)}>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add new driver
+                </Button>
                 <Button size="sm" onClick={() => setStep("review")} disabled={unmappedCount === mappedRows.length}>
                   Continue to Review
                 </Button>
