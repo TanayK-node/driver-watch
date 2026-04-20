@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { ArrowRight, BarChart3, FileSearch, Gauge, MapPinned, Route, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import heroOverviewImage from "@/assets/hero-overview.svg";
+import heroOverviewImage from "@/assets/hero.png";
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const features = [
@@ -55,19 +55,19 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   return (
-    <DashboardLayout title="Operational Intelligence">
+    <DashboardLayout title="TUTEM IQ">
       <div className="mx-auto max-w-6xl space-y-6">
         <section>
           <Card>
-            <CardContent className="p-6 md:p-8">
-              <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+            <CardContent className="p-6 md:p-4">
+              <div className="grid gap-6 lg:grid-cols-[2fr_1.5fr]">
                 <div className="space-y-4">
-                  <p className="text-sm font-medium text-primary">Driver Monitoring and Operational Intelligence</p>
+                  {/* <p className="text-sm font-medium text-primary">Driver Monitoring and Operational Intelligence</p> */}
                   <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-                    Driver Monitoring and Operational Intelligence Dashboard
+                    
                   </h1>
                   <p className="max-w-xl text-sm text-muted-foreground md:text-base">
-                    The Driver Monitoring and Operational Intelligence Dashboard is designed as an automated analytical system to monitor and evaluate the operational behavior of registered auto drivers using structured trip and movement data. 
+                    TUTEM IQ Campus is a smart mobility intelligence dashboard designed to monitor and analyze informal paratransit systems operating within a controlled campus environment. The platform integrates real-time GPS data from registered auto-rickshaw drivers to provide actionable insights for operational monitoring, security oversight, and data-driven decision-making. 
 
                   </p>
                   {/* <div className="flex flex-wrap gap-3">
@@ -92,7 +92,7 @@ export default function LandingPage() {
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Card className="border-muted">
+                    {/* <Card className="border-muted">
                       <CardHeader className="pb-1">
                         <CardTitle className="text-sm">Attendance Trend</CardTitle>
                       </CardHeader>
@@ -104,9 +104,9 @@ export default function LandingPage() {
                           </LineChart>
                         </ResponsiveContainer>
                       </CardContent>
-                    </Card>
+                    </Card> */}
 
-                    <Card className="border-muted">
+                    {/* <Card className="border-muted">
                       <CardHeader className="pb-1">
                         <CardTitle className="text-sm">Verification Split</CardTitle>
                       </CardHeader>
@@ -122,7 +122,7 @@ export default function LandingPage() {
                           </PieChart>
                         </ResponsiveContainer>
                       </CardContent>
-                    </Card>
+                    </Card> */}
                   </div>
                 </div>
               </div>
@@ -130,50 +130,8 @@ export default function LandingPage() {
           </Card>
         </section>
 
-        <section>
-          <Card>
-            <CardHeader>
-              <CardDescription>Location</CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <MapPinned className="h-5 w-5 text-primary" />
-                IIT Bombay
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-hidden rounded-lg border">
-                <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3769.4204230664327!2d72.91253117444579!3d19.133065550180124!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7c7f189efc039%3A0x68fdcea4c5c5894e!2sIndian%20Institute%20of%20Technology%20Bombay!5e0!3m2!1sen!2sin!4v1776616813665!5m2!1sen!2sin"
-                  width="100%"
-                  height="380"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title="IIT Bombay location map"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+        {/* s */}
 
-        <section>
-          <Card>
-            <CardHeader>
-              <CardDescription>About</CardDescription>
-              <CardTitle className="text-2xl">Why this dashboard exists</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
-              <p>
-                The platform is designed as an automated analytical system to monitor and evaluate the operational behavior
-                of registered auto drivers using structured trip and movement data.
-              </p>
-              <p>
-                Its primary purpose is to replace the existing manual CSV-based monitoring workflow, which requires repetitive
-                inspection, periodic analysis, and manual interpretation of driver performance indicators.
-              </p>
-            </CardContent>
-          </Card>
-        </section>
 
         <section className="space-y-3">
           <h2 className="text-2xl font-semibold tracking-tight">Features</h2>

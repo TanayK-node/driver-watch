@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -59,8 +61,13 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-family: "Open Sans", sans-serif;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: inherit;
   }
 }
 

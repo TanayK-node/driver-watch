@@ -17,6 +17,7 @@ import DriverAttendanceDetail from "./pages/DriverAttendanceDetail";
 import RouteAdherence from "./pages/RouteAdherence";
 import TripAnalytics from "./pages/TripAnalytics";
 import LiveMap from "./pages/LiveMap";
+import WIPPage from "./pages/WIPPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,26 @@ const App = () => (
           <Route path="/routes" element={<Protected><RouteAdherence /></Protected>} />
           <Route path="/trips" element={<Protected><TripAnalytics /></Protected>} />
           <Route path="/map" element={<Protected><LiveMap /></Protected>} />
+          <Route
+            path="/tutem/user-database"
+            element={<Protected><WIPPage title="User Database" description="The TUTEM user database view is under development." /></Protected>}
+          />
+          <Route
+            path="/tutem/daily-trips"
+            element={<Protected><WIPPage title="Daily Trips" description="The daily trips page is under development." /></Protected>}
+          />
+          <Route
+            path="/tutem/verification-status"
+            element={<Protected><WIPPage title="Verification Status" description="The verification status page is under development." /></Protected>}
+          />
+          <Route
+            path="/tutem/feedback"
+            element={<Protected><WIPPage title="Feedback" description="The feedback page is under development." /></Protected>}
+          />
+          <Route
+            path="/rnd"
+            element={<Protected><WIPPage title="R&D" description="The R&D section is under development." /></Protected>}
+          />
 
           <Route path="*" element={<NotFound />} />
         </Routes>
