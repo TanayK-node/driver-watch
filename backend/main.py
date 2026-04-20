@@ -10,7 +10,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from bson import ObjectId
-
+from datetime import datetime, timedelta
 # Load environment variables
 load_dotenv()
 
@@ -210,7 +210,133 @@ async def fetch_mongo_drivers():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching from MongoDB: {str(e)}")
+
+# Add these collections below your existing mongo_users_col and mongo_vehicles_col
+mongo_location_col = mongo_db["driverlocationstatuses"]
+mongo_route_col = mongo_db["VehicleRouteIITB"]
+
+# IITB Campus Polygon for Ray-Casting
+IITB_POLYGON = [
+    (19.13566848849955, 72.90263407610097),
+    (19.142781379387944, 72.91669570758766),
+    (19.128969244302084, 72.91994041529868),
+    (19.12529452563203, 72.91693911530889),
+    (19.124018769919676, 72.90866132237274)
+]
+
+def is_inside_polygon(lat, lng, poly):
+    n = len(poly)
+    inside = False
+    p1x, p1y = poly[0]
+    for i in range(1, n + 1):
+        p2x, p2y = poly[i % n]
+        if lng > min(p1y, p2y):
+            if lng <= max(p1y, p2y):
+                if lat <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xints = (lng - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or lat <= xints:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    return inside
+
+@app.get("/api/ride-request/drivers/name/locations/iitb")
+async def get_live_iitb_drivers():
+    if not mongo_client:
+        raise HTTPException(status_code=500, detail="MongoDB not connected")
+
+    from datetime import datetime, timedelta
+    from bson import ObjectId
+
+    # --- TEMPORARY DEBUGGING ---
+    # Fetch ALL locations instead of filtering by time
+    active_locations = list(mongo_location_col.find({}))
     
+    print(f"🔍 DEBUG: Fetched {len(active_locations)} TOTAL locations from the database.")
+
+    # 1. TIME FILTER
+    time_threshold = datetime.utcnow() - timedelta(minutes=7)
+    
+    # Let's fetch the locations. If this returns 0, the issue is how updatedAt is stored in Mongo.
+    active_locations = list(mongo_location_col.find({
+        "updatedAt": {"$gte": time_threshold}
+    }))
+    
+    print(f"🔍 DEBUG: Found {len(active_locations)} locations updated in the last 7 minutes.")
+
+    merged_drivers = []
+    
+    for loc in active_locations:
+        driver_id = loc.get("driverId")
+        if not driver_id: 
+            continue
+            
+        # Safely convert coordinates to floats in case they are stored as strings
+        lat, lng = 0.0, 0.0
+        try:
+            loc_obj = loc.get("location", {})
+            
+            # Check if it's your Array format: { type: "Point", coordinates: [Lat, Lng] }
+            if isinstance(loc_obj, dict) and "coordinates" in loc_obj:
+                coords = loc_obj.get("coordinates", [0.0, 0.0])
+                lat = float(coords[0]) # 19.13...
+                lng = float(coords[1]) # 72.91...
+                
+            # Check if it's an object format: { latitude: X, longitude: Y }
+            elif isinstance(loc_obj, dict) and "latitude" in loc_obj:
+                lat = float(loc_obj.get("latitude", 0))
+                lng = float(loc_obj.get("longitude", 0))
+                
+        except (ValueError, TypeError, IndexError):
+            print(f"⚠️ Invalid coordinates format for driver {driver_id}")
+            continue
+
+        # Convert IDs safely to handle both string and ObjectId formats
+        str_id = str(driver_id)
+        try:
+            obj_id = ObjectId(str_id)
+        except:
+            print(f"⚠️ Invalid ObjectId format for {driver_id}")
+            continue
+
+        # 3. LOOKUPS (Bulletproof: Checks both String and ObjectId just in case)
+        user_info = mongo_users_col.find_one({"_id": obj_id}) or {}
+        
+        vehicle_info = mongo_vehicles_col.find_one({"driverId": str_id}) or mongo_vehicles_col.find_one({"driverId": obj_id}) or {}
+        
+        route_info = mongo_route_col.find_one({"driverId": str_id}) or mongo_route_col.find_one({"driverId": obj_id}) or {}
+        
+        # 4. ORGANIZATION FILTER
+        org = vehicle_info.get("organization")
+        if org != "IITB Campus Auto":
+            print(f"🚫 Dropped {driver_id}: Wrong organization ('{org}')")
+            continue
+            
+        # print(f"✅ Added {user_info.get('name', 'Unknown')} to live dashboard!")
+        
+        merged_drivers.append({
+            "driverId": str_id,
+            "name": user_info.get("name", "Unknown Driver"),
+            "shuttleService": user_info.get("shuttleService", False),
+            "latitude": lat,
+            "longitude": lng,
+            "vehicleRegistrationNo": vehicle_info.get("vehicleRegistrationNo", "N/A"),
+            "vehicleRoute": route_info.get("colorName", "Not Assigned").lower()
+        })
+        
+    return sorted(merged_drivers, key=lambda x: x["name"])
+
+@app.get("/api/ride-request/drivers/name/locations/iitb/getIITBDriverCount")
+async def get_iitb_registered_count():
+    if not mongo_client:
+        raise HTTPException(status_code=500, detail="MongoDB not connected")
+        
+    count = mongo_vehicles_col.count_documents({"organization": "IITB Campus Auto"})
+    return {"count": count}
+
+
+
+
 @app.post("/api/attendance/verify-gps-bulk")
 async def verify_gps_attendance_bulk(
     file: UploadFile = File(...)
