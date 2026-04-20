@@ -586,6 +586,7 @@ export default function AttendanceUpload() {
                     <TableHead>Raw Name</TableHead>
                     <TableHead>Matched Driver</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -624,6 +625,19 @@ export default function AttendanceUpload() {
                           <Badge className="bg-warning/15 text-warning border-warning/30" variant="outline">
                             <AlertTriangle className="h-3 w-3 mr-1" /> Needs review
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!r.driverId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => openAddDriver(i)}
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            Add new driver
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
