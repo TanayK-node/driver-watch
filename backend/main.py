@@ -43,14 +43,18 @@ if mongo_uri:
 app = FastAPI(title="Driver Attendance GPS Backend")
 
 # Setup CORS for the React Frontend
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "https://driver-watch.vercel.app",
+    "https://driver-watch.onrender.com",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-        "http://localhost:3000",
-        "http://localhost:8080",
-        "https://driver-watch.vercel.app"
-    ],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://([a-z0-9-]+\.)*vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

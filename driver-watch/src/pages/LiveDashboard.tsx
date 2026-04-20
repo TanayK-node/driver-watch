@@ -15,7 +15,32 @@ L.Icon.Default.mergeOptions({
     shadowUrl: markerShadow,
 });
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const RENDER_BACKEND_URL = 'https://driver-watch.onrender.com';
+const API_BASE_URLS = Array.from(
+    new Set(
+        [
+            import.meta.env.VITE_API_BASE_URL,
+            'http://localhost:8000',
+            RENDER_BACKEND_URL,
+        ].filter((value): value is string => Boolean(value))
+    )
+);
+
+const fetchFromBackends = async (path: string) => {
+    let lastError: Error | null = null;
+
+    for (const baseUrl of API_BASE_URLS) {
+        try {
+            const response = await fetch(`${baseUrl}${path}`);
+            if (response.ok) return response;
+            lastError = new Error(`Request failed at ${baseUrl} with status ${response.status}`);
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error('Unknown network error');
+        }
+    }
+
+    throw lastError ?? new Error(`Unable to reach backend for ${path}`);
+};
 
 const autoIcon = new L.Icon({
     iconUrl: 'https://tutem.in/auto.png',
@@ -86,8 +111,8 @@ export default function LiveDashboard() {
         try {
             setError(null);
             const [driversRes, countRes, colorsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/ride-request/drivers/name/locations/iitb`),
-                fetch(`${API_BASE_URL}/api/ride-request/drivers/name/locations/iitb/getIITBDriverCount`),
+                fetchFromBackends('/api/ride-request/drivers/name/locations/iitb'),
+                fetchFromBackends('/api/ride-request/drivers/name/locations/iitb/getIITBDriverCount'),
                 supabase.from('drivers').select('driverId, vehicleColor')
             ]);
 
