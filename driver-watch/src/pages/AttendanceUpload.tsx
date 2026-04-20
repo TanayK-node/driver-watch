@@ -12,9 +12,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2, MapPin, ClipboardList } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2, MapPin, ClipboardList, UserPlus } from "lucide-react";
 import BulkGpsAttendance from "./BulkGpsAttendance";
 import { toast } from "sonner";
 
@@ -89,6 +93,17 @@ export default function AttendanceUpload() {
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [overrideDate, setOverrideDate] = useState("");
+  const [addDriverOpen, setAddDriverOpen] = useState(false);
+  const [addDriverForRowIndex, setAddDriverForRowIndex] = useState<number | null>(null);
+  const [newDriver, setNewDriver] = useState({
+    driverId: "",
+    name: "",
+    phone: "",
+    vehicleRegistrationNo: "",
+    color: "",
+  });
+  const [creatingDriver, setCreatingDriver] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["drivers-list"],
@@ -280,7 +295,53 @@ export default function AttendanceUpload() {
   const unmappedCount = mappedRows.filter((r) => !r.driverId).length;
   const missingCheckout = mappedRows.filter((r) => !r.outTime).length;
 
-  const handleSave = async () => {
+  const openAddDriver = (rowIndex: number | null) => {
+    const prefillName = rowIndex !== null ? mappedRows[rowIndex]?.rawName ?? "" : "";
+    setAddDriverForRowIndex(rowIndex);
+    setNewDriver({
+      driverId: "",
+      name: prefillName,
+      phone: "",
+      vehicleRegistrationNo: "",
+      color: "",
+    });
+    setAddDriverOpen(true);
+  };
+
+  const handleCreateDriver = async () => {
+    if (!newDriver.driverId.trim() || !newDriver.name.trim()) {
+      toast.error("Driver ID and Name are required");
+      return;
+    }
+    setCreatingDriver(true);
+    const { error } = await supabase.from("drivers").insert({
+      driverId: newDriver.driverId.trim(),
+      name: newDriver.name.trim(),
+      phone: newDriver.phone.trim() || null,
+      vehicleRegistrationNo: newDriver.vehicleRegistrationNo.trim() || null,
+      color: newDriver.color.trim() || null,
+    });
+    setCreatingDriver(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Driver ${newDriver.name} added`);
+    await queryClient.invalidateQueries({ queryKey: ["drivers-list"] });
+    // Auto-map the row that triggered this
+    if (addDriverForRowIndex !== null) {
+      const idx = addDriverForRowIndex;
+      const created = { driverId: newDriver.driverId.trim(), name: newDriver.name.trim() };
+      setMappedRows((prev) =>
+        prev.map((r, i) =>
+          i === idx
+            ? { ...r, driverId: created.driverId, driverName: created.name, matchStatus: "manual" as const }
+            : r
+        )
+      );
+    }
+    setAddDriverOpen(false);
+  };
     const valid = mappedRows.filter((r) => r.driverId);
     if (valid.length === 0) {
       toast.error("No mapped records to save");
@@ -507,6 +568,10 @@ export default function AttendanceUpload() {
                 <Button variant="outline" size="sm" onClick={() => setStep("upload")}>
                   Back
                 </Button>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => openAddDriver(null)}>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add new driver
+                </Button>
                 <Button size="sm" onClick={() => setStep("review")} disabled={unmappedCount === mappedRows.length}>
                   Continue to Review
                 </Button>
@@ -525,6 +590,7 @@ export default function AttendanceUpload() {
                     <TableHead>Raw Name</TableHead>
                     <TableHead>Matched Driver</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -563,6 +629,19 @@ export default function AttendanceUpload() {
                           <Badge className="bg-warning/15 text-warning border-warning/30" variant="outline">
                             <AlertTriangle className="h-3 w-3 mr-1" /> Needs review
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!r.driverId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => openAddDriver(i)}
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            Add new driver
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
@@ -635,6 +714,77 @@ export default function AttendanceUpload() {
             <BulkGpsAttendance />
           </TabsContent>
         </Tabs>
+
+        <Dialog open={addDriverOpen} onOpenChange={setAddDriverOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add new driver</DialogTitle>
+              <DialogDescription>
+                Create a driver record in the dashboard. This stores the driver in Supabase only — your MongoDB source is not modified.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 py-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="d-id">Driver ID *</Label>
+                <Input
+                  id="d-id"
+                  placeholder="e.g. DRV1042"
+                  value={newDriver.driverId}
+                  onChange={(e) => setNewDriver((p) => ({ ...p, driverId: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="d-name">Name *</Label>
+                <Input
+                  id="d-name"
+                  placeholder="Driver full name"
+                  value={newDriver.name}
+                  onChange={(e) => setNewDriver((p) => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="d-phone">Phone</Label>
+                  <Input
+                    id="d-phone"
+                    placeholder="Optional"
+                    value={newDriver.phone}
+                    onChange={(e) => setNewDriver((p) => ({ ...p, phone: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="d-veh">Vehicle Reg. No</Label>
+                  <Input
+                    id="d-veh"
+                    placeholder="Optional"
+                    value={newDriver.vehicleRegistrationNo}
+                    onChange={(e) =>
+                      setNewDriver((p) => ({ ...p, vehicleRegistrationNo: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="d-color">Color</Label>
+                <Input
+                  id="d-color"
+                  placeholder="e.g. yellow, green, blue"
+                  value={newDriver.color}
+                  onChange={(e) => setNewDriver((p) => ({ ...p, color: e.target.value }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddDriverOpen(false)} disabled={creatingDriver}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateDriver} disabled={creatingDriver} className="gap-2">
+                {creatingDriver ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                {creatingDriver ? "Adding..." : "Add Driver"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }

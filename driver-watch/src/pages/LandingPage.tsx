@@ -133,6 +133,32 @@ export default function LandingPage() {
         <section>
           <Card>
             <CardHeader>
+              <CardDescription>Location</CardDescription>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <MapPinned className="h-5 w-5 text-primary" />
+                IIT Bombay
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-hidden rounded-lg border">
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3769.4204230664327!2d72.91253117444579!3d19.133065550180124!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7c7f189efc039%3A0x68fdcea4c5c5894e!2sIndian%20Institute%20of%20Technology%20Bombay!5e0!3m2!1sen!2sin!4v1776616813665!5m2!1sen!2sin"
+                  width="100%"
+                  height="380"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title="IIT Bombay location map"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section>
+          <Card>
+            <CardHeader>
               <CardDescription>About</CardDescription>
               <CardTitle className="text-2xl">Why this dashboard exists</CardTitle>
             </CardHeader>
