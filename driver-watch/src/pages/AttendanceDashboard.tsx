@@ -13,13 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Users, UserCheck, UserX, CalendarIcon, AlertTriangle, ShieldCheck, Upload, BarChart3 } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useLocation, useNavigate } from "react-router-dom";
 import AttendanceUpload from "./AttendanceUpload";
+import { getJson } from "@/lib/api";
 
 export default function AttendanceDashboard() {
   const navigate = useNavigate();
@@ -45,21 +45,16 @@ export default function AttendanceDashboard() {
   const { data: drivers = [] } = useQuery({
     queryKey: ["drivers-all"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("drivers").select("driverId, name");
-      if (error) throw error;
-      return data ?? [];
+      const response = await getJson<{ data: Array<{ driverId: string; name: string }> }>("/api/drivers");
+      return response.data ?? [];
     },
   });
 
   const { data: attendance = [], isLoading } = useQuery({
     queryKey: ["attendance", dateStr],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance")
-        .select("*")
-        .eq("date", dateStr);
-      if (error) throw error;
-      return data ?? [];
+      const response = await getJson<{ data: Array<Record<string, any>> }>(`/api/attendance?date=${dateStr}`);
+      return response.data ?? [];
     },
   });
 

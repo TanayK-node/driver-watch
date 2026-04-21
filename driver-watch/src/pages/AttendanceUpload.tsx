@@ -16,11 +16,11 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload, FileText, Wand2, Save, AlertTriangle, CheckCircle2, Camera, Loader2, MapPin, ClipboardList, UserPlus } from "lucide-react";
 import BulkGpsAttendance from "./BulkGpsAttendance";
 import { toast } from "sonner";
+import { getJson, postJson } from "@/lib/api";
 
 interface RawRow {
   rawName: string;
@@ -108,9 +108,8 @@ export default function AttendanceUpload() {
   const { data: drivers = [] } = useQuery({
     queryKey: ["drivers-list"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("drivers").select("driverId, name");
-      if (error) throw error;
-      return data ?? [];
+      const response = await getJson<{ data: Array<{ driverId: string; name: string }> }>("/api/drivers");
+      return response.data ?? [];
     },
   });
 
@@ -228,16 +227,12 @@ export default function AttendanceUpload() {
       }
       const base64 = btoa(binary);
 
-      const { data, error } = await supabase.functions.invoke("extract-attendance", {
-        body: {
-          imageBase64: base64,
-          drivers: drivers.map((d) => ({ driverId: d.driverId, name: d.name })),
-        },
+      const response = await postJson<{ rows?: any[] }>("/api/attendance/extract-from-image", {
+        imageBase64: base64,
+        drivers: drivers.map((d) => ({ driverId: d.driverId, name: d.name })),
       });
 
-      if (error) throw error;
-
-      const rows: RawRow[] = (data?.rows || []).map((r: any) => ({
+      const rows: RawRow[] = (response.rows || []).map((r: any) => ({
         rawName: r.rawName || "",
         date: normalizeDate(r.date || ""),
         inTime: normalizeTime(r.inTime || ""),
@@ -314,18 +309,20 @@ export default function AttendanceUpload() {
       return;
     }
     setCreatingDriver(true);
-    const { error } = await supabase.from("drivers").insert({
-      driverId: newDriver.driverId.trim(),
-      name: newDriver.name.trim(),
-      phone: newDriver.phone.trim() || null,
-      vehicleRegistrationNo: newDriver.vehicleRegistrationNo.trim() || null,
-      color: newDriver.color.trim() || null,
-    });
-    setCreatingDriver(false);
-    if (error) {
-      toast.error(error.message);
+    try {
+      await postJson("/api/drivers", {
+        driverId: newDriver.driverId.trim(),
+        name: newDriver.name.trim(),
+        phone: newDriver.phone.trim() || null,
+        vehicleRegistrationNo: newDriver.vehicleRegistrationNo.trim() || null,
+        vehicleColor: newDriver.color.trim() || null,
+      });
+    } catch (error: any) {
+      setCreatingDriver(false);
+      toast.error(error.message || "Failed to add driver");
       return;
     }
+    setCreatingDriver(false);
     toast.success(`Driver ${newDriver.name} added`);
     await queryClient.invalidateQueries({ queryKey: ["drivers-list"] });
     // Auto-map the row that triggered this
@@ -369,14 +366,14 @@ export default function AttendanceUpload() {
       source: "manual",
     }));
 
-    const { error } = await supabase
-      .from("attendance")
-      .upsert(records, { onConflict: "driver_id,date" });
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
+    try {
+      await postJson("/api/attendance/bulk", { records });
+    } catch (error: any) {
+      setSaving(false);
+      toast.error(error.message || "Failed to save attendance");
       return;
     }
+    setSaving(false);
 
     if (skippedDuplicates > 0) {
       toast.success(
@@ -722,7 +719,7 @@ export default function AttendanceUpload() {
             <DialogHeader>
               <DialogTitle>Add new driver</DialogTitle>
               <DialogDescription>
-                Create a driver record in the dashboard. This stores the driver in Supabase only — your MongoDB source is not modified.
+                Create a driver record in MongoDB. This stores the driver in TutemIq only.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-3 py-2">

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +8,7 @@ import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import { getJson } from '@/lib/api';
 
 // Fix for default Leaflet icon issues in React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -17,33 +17,6 @@ L.Icon.Default.mergeOptions({
     iconUrl: markerIcon,
     shadowUrl: markerShadow,
 });
-
-const RENDER_BACKEND_URL = 'https://driver-watch.onrender.com';
-const API_BASE_URLS = Array.from(
-    new Set(
-        [
-            import.meta.env.VITE_API_BASE_URL,
-            'http://localhost:8000',
-            RENDER_BACKEND_URL,
-        ].filter((value): value is string => Boolean(value))
-    )
-);
-
-const fetchFromBackends = async (path: string) => {
-    let lastError: Error | null = null;
-
-    for (const baseUrl of API_BASE_URLS) {
-        try {
-            const response = await fetch(`${baseUrl}${path}`);
-            if (response.ok) return response;
-            lastError = new Error(`Request failed at ${baseUrl} with status ${response.status}`);
-        } catch (error) {
-            lastError = error instanceof Error ? error : new Error('Unknown network error');
-        }
-    }
-
-    throw lastError ?? new Error(`Unable to reach backend for ${path}`);
-};
 
 const autoIcon = new L.Icon({
     iconUrl: 'https://tutem.in/auto.png',
@@ -113,30 +86,13 @@ export default function LiveDashboard() {
     const fetchDashboardData = async () => {
         try {
             setError(null);
-            const [driversRes, countRes, colorsRes] = await Promise.all([
-                fetchFromBackends('/api/ride-request/drivers/name/locations/iitb'),
-                fetchFromBackends('/api/ride-request/drivers/name/locations/iitb/getIITBDriverCount'),
-                supabase.from('drivers').select('driverId, vehicleColor')
+            const [driversRes, countRes] = await Promise.all([
+                getJson<{ data: Driver[] }>('/api/ride-request/drivers/name/locations/iitb'),
+                getJson<{ count: number }>('/api/drivers/count'),
             ]);
 
-            if (colorsRes.error) throw colorsRes.error;
-            if (!driversRes.ok) throw new Error('Failed to load live drivers');
-            if (!countRes.ok) throw new Error('Failed to load registered driver count');
-
-            const driversData = await driversRes.json();
-            const countData = await countRes.json();
-
-            const colorMap = new Map(
-                (colorsRes.data ?? []).map((driver) => [driver.driverId, driver.vehicleColor ?? null])
-            );
-
-            setDrivers(
-                (driversData ?? []).map((driver: Driver) => ({
-                    ...driver,
-                    vehicleColor: colorMap.get(driver.driverId) ?? null,
-                }))
-            );
-            setTotalRegistered(countData.count);
+            setDrivers(driversRes.data ?? []);
+            setTotalRegistered(countRes.count ?? 0);
         } catch (err) {
             console.error("API Error:", err);
             setError("Error connecting to server. Retrying...");

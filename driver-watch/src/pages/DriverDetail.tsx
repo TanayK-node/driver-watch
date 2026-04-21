@@ -1,11 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Phone, Car, CreditCard, Building2, Palette, Mail, MapPin, Star, CalendarDays, User } from "lucide-react";
+import { getJson } from "@/lib/api";
 
 export default function DriverDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,13 +20,8 @@ export default function DriverDetail() {
   const { data: driver, isLoading } = useQuery({
     queryKey: ["driver", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("drivers")
-        .select("*")
-        .eq("driverId", id!)
-        .single();
-      if (error) throw error;
-      return data;
+      const response = await getJson<{ data: Record<string, any> }>(`/api/drivers/${id}`);
+      return response.data;
     },
     enabled: !!id,
   });

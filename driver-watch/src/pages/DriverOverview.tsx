@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { KPICard } from "@/components/KPICard";
 import { Input } from "@/components/ui/input";
@@ -14,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { getJson } from "@/lib/api";
 
 export default function DriverOverview() {
   const [search, setSearch] = useState("");
@@ -29,31 +29,24 @@ export default function DriverOverview() {
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ["drivers"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("drivers").select("*");
-      if (error) throw error;
-      return data;
+      const response = await getJson<{ data: Array<Record<string, any>> }>("/api/drivers");
+      return response.data ?? [];
     },
   });
 
   const handleSyncMongo = async () => {
     setIsSyncing(true);
     try {
-      const response = await fetch("https://driver-watch.onrender.com/api/sync-drivers", {
-      // const response = await fetch("http://127.0.0.1:8000/api/sync-drivers", {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error("Failed to sync");
-      const result = await response.json();
       await queryClient.invalidateQueries({ queryKey: ["drivers"] });
       await queryClient.invalidateQueries({ queryKey: ["drivers-all"] });
       toast({
-        title: "Drivers Synced",
-        description: result.message || "IITB drivers updated successfully.",
+        title: "Drivers Refreshed",
+        description: "MongoDB data refreshed successfully.",
       });
     } catch (error) {
       toast({
-        title: "Sync Failed",
-        description: "Could not connect to the backend.",
+        title: "Refresh Failed",
+        description: "Could not refresh data from the backend.",
         variant: "destructive",
       });
     } finally {

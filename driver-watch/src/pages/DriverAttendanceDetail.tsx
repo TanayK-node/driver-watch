@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { KPICard } from "@/components/KPICard";
 import { ArrowLeft, CalendarDays, Clock, UserCheck } from "lucide-react";
+import { getJson } from "@/lib/api";
 
 export default function DriverAttendanceDetail() {
   const { driverId } = useParams<{ driverId: string }>();
@@ -19,13 +19,8 @@ export default function DriverAttendanceDetail() {
   const { data: driver } = useQuery({
     queryKey: ["driver", driverId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("drivers")
-        .select("*")
-        .eq("driverId", driverId!)
-        .single();
-      if (error) throw error;
-      return data;
+      const response = await getJson<{ data: Record<string, any> }>(`/api/drivers/${driverId}`);
+      return response.data;
     },
     enabled: !!driverId,
   });
@@ -33,13 +28,8 @@ export default function DriverAttendanceDetail() {
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["attendance-history", driverId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance")
-        .select("*")
-        .eq("driver_id", driverId!)
-        .order("date", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      const response = await getJson<{ data: Array<Record<string, any>> }>(`/api/attendance?driver_id=${driverId}`);
+      return response.data ?? [];
     },
     enabled: !!driverId,
   });
