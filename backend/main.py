@@ -3,6 +3,7 @@ from itertools import count
 import os
 import io
 import json
+import asyncio
 from datetime import datetime, timezone
 import pandas as pd
 import geopandas as gpd
@@ -21,11 +22,14 @@ load_dotenv()
 mongo_client = None
 mongo_db = None
 mongo_drivers_col = None
+mongo_users_col = None
 mongo_attendance_col = None
 mongo_location_col = None
 mongo_route_col = None
 legacy_users_col = None
 legacy_vehicles_col = None
+user_sync_task = None
+users_last_sync_at = None
 
 mongo_uri = os.environ.get("MONGO_URI")
 if mongo_uri:
@@ -35,6 +39,7 @@ if mongo_uri:
         mongo_db = mongo_client[mongo_db_name]
 
         mongo_drivers_col = mongo_db["drivers"]
+        mongo_users_col = mongo_db["users"]
         mongo_attendance_col = mongo_db["attendance"]
 
         # Keep legacy collections available for one-time migration from the old source database.
@@ -43,6 +48,12 @@ if mongo_uri:
         legacy_vehicles_col = legacy_db["drivervehicledetails"]
         mongo_route_col = legacy_db["vehiclerouteiitbs"]
         mongo_location_col = legacy_db["driverlocationstatuses"]
+
+        try:
+            mongo_users_col.create_index("userId", unique=True)
+        except Exception:
+            # Index creation failures should not block API startup.
+            pass
     except Exception as e:
         print(f"Failed to connect to MongoDB: {e}")
         mongo_client = None
@@ -201,6 +212,129 @@ def parse_mongo_datetime(value):
     return parsed.astimezone(timezone.utc)
 
 
+def to_iso_string(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if value is None:
+        return None
+    value_str = str(value).strip()
+    return value_str or None
+
+
+def sync_legacy_users_to_mongo_once() -> dict:
+    global users_last_sync_at
+
+    if mongo_client is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not configured.")
+
+    if legacy_users_col is None or mongo_users_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB collections not configured.")
+
+    role_query = {
+        "$or": [
+            {"userRole": {"$regex": "^user$", "$options": "i"}},
+            {"userrole": {"$regex": "^user$", "$options": "i"}},
+            {"role": {"$regex": "^user$", "$options": "i"}},
+        ]
+    }
+
+    source_users = list(legacy_users_col.find(role_query))
+    upserted = 0
+
+    for user in source_users:
+        user_id = str(user.get("_id") or "").strip()
+        if not user_id:
+            continue
+
+        is_verified = user.get("isVerified")
+        if isinstance(is_verified, bool):
+            verification_status = "verified" if is_verified else "pending"
+        else:
+            verification_status = (
+                user.get("verificationStatus")
+                or user.get("verification_status")
+                or user.get("kycStatus")
+                or user.get("kyc_status")
+                or "pending"
+            )
+
+        payload = {
+            "userId": user_id,
+            "name": user.get("name") or "Unknown User",
+            "email": user.get("email") or "",
+            "phone": user.get("phone") or user.get("phoneNumber") or "",
+            "dob": to_iso_string(user.get("dateOfBirth") or user.get("dob")),
+            "gender": user.get("gender") or "",
+            "createdAt": to_iso_string(user.get("createdAt")),
+            "rating": user.get("rating") if user.get("rating") is not None else 0,
+            "verificationStatus": str(verification_status),
+            "isVerified": True if str(verification_status).lower() == "verified" else False,
+            "address": user.get("address") or "",
+            "deviceId": user.get("deviceId") or user.get("device_id") or "",
+            "sourceUpdatedAt": to_iso_string(user.get("updatedAt")),
+            "syncedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+        mongo_users_col.update_one(
+            {"userId": user_id},
+            {"$set": payload},
+            upsert=True,
+        )
+        upserted += 1
+
+    users_last_sync_at = datetime.now(timezone.utc)
+
+    return {
+        "status": "success",
+        "source_count": len(source_users),
+        "synced_count": upserted,
+        "last_synced_at": users_last_sync_at.isoformat(),
+    }
+
+
+async def auto_sync_users_loop():
+    interval_seconds = int(os.environ.get("SYNC_USERS_INTERVAL_SECONDS", "300"))
+    # Run an initial sync quickly after startup.
+    await asyncio.sleep(2)
+
+    while True:
+        try:
+            result = sync_legacy_users_to_mongo_once()
+            print(
+                f"[users-sync] Synced {result.get('synced_count', 0)} users at {result.get('last_synced_at', 'n/a')}"
+            )
+        except HTTPException as sync_err:
+            print(f"[users-sync] HTTP error: {sync_err.detail}")
+        except Exception as sync_err:
+            print(f"[users-sync] Unexpected error: {sync_err}")
+
+        await asyncio.sleep(max(60, interval_seconds))
+
+
+@app.on_event("startup")
+async def start_background_sync_tasks():
+    global user_sync_task
+
+    if mongo_client is None or legacy_users_col is None or mongo_users_col is None:
+        return
+
+    if user_sync_task is None or user_sync_task.done():
+        user_sync_task = asyncio.create_task(auto_sync_users_loop())
+
+
+@app.on_event("shutdown")
+async def stop_background_sync_tasks():
+    global user_sync_task
+
+    if user_sync_task and not user_sync_task.done():
+        user_sync_task.cancel()
+        try:
+            await user_sync_task
+        except asyncio.CancelledError:
+            pass
+    user_sync_task = None
+
+
 @app.post("/api/sync-drivers")
 async def sync_legacy_drivers_to_mongo():
     if mongo_client is None:
@@ -294,6 +428,55 @@ async def sync_legacy_drivers_to_mongo():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sync error: {str(e)}")
+
+
+@app.post("/api/sync-users")
+async def sync_legacy_users_to_mongo():
+    try:
+        return sync_legacy_users_to_mongo_once()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"User sync error: {str(e)}")
+
+
+@app.get("/api/users")
+async def list_users():
+    if mongo_client is None or mongo_users_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        users = [serialize_mongo_doc(user) for user in mongo_users_col.find({})]
+        return {"status": "success", "total_users": len(users), "data": users, "last_synced_at": users_last_sync_at.isoformat() if users_last_sync_at else None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching users: {str(e)}")
+
+
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: str):
+    if mongo_client is None or mongo_users_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        user = mongo_users_col.find_one({"userId": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
+        return {"status": "success", "data": serialize_mongo_doc(user)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching user: {str(e)}")
+
+
+@app.get("/api/users/count")
+async def count_users():
+    if mongo_client is None or mongo_users_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        return {"status": "success", "count": mongo_users_col.count_documents({}), "last_synced_at": users_last_sync_at.isoformat() if users_last_sync_at else None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error counting users: {str(e)}")
 
 @app.get("/api/external/drivers")
 async def fetch_mongo_drivers():

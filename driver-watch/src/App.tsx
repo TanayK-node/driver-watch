@@ -19,6 +19,8 @@ import DriverAttendanceDetail from "./pages/DriverAttendanceDetail";
 import RouteAdherence from "./pages/RouteAdherence";
 import TripAnalytics from "./pages/TripAnalytics";
 import LiveMap from "./pages/LiveMap";
+import UserDatabase from "./pages/UserDatabase";
+import UserDetail from "./pages/UserDetail";
 import WIPPage from "./pages/WIPPage";
 import NotFound from "./pages/NotFound";
 
@@ -51,6 +53,14 @@ function DataWarmup() {
       queryKey: ["attendance", today],
       queryFn: async () => {
         const response = await getJson<{ data: Array<Record<string, any>> }>(`/api/attendance?date=${today}`);
+        return response.data ?? [];
+      },
+    });
+
+    void queryClient.prefetchQuery({
+      queryKey: ["users"],
+      queryFn: async () => {
+        const response = await getJson<{ data: Array<Record<string, any>> }>("/api/users");
         return response.data ?? [];
       },
     });
@@ -89,7 +99,11 @@ const App = () => (
           <Route path="/map" element={<Protected><LiveMap /></Protected>} />
           <Route
             path="/tutem/user-database"
-            element={<Protected><WIPPage title="User Database" description="The TUTEM user database view is under development." /></Protected>}
+            element={<Protected><UserDatabase /></Protected>}
+          />
+          <Route
+            path="/tutem/user-database/:userId"
+            element={<Protected><UserDetail /></Protected>}
           />
           <Route
             path="/tutem/daily-trips"
