@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { getJson } from "@/lib/api";
 export default function DriverDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const formatDate = (value?: string | null) => {
     if (!value) return "-";
@@ -24,6 +25,10 @@ export default function DriverDetail() {
       return response.data;
     },
     enabled: !!id,
+    initialData: () => {
+      const drivers = queryClient.getQueryData<Array<Record<string, any>>>(["drivers"]);
+      return drivers?.find((d) => d.driverId === id);
+    },
   });
 
   if (isLoading) {

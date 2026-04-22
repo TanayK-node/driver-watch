@@ -43,7 +43,7 @@ export default function AttendanceDashboard() {
   }, [dateStr, location.search, navigate]);
 
   const { data: drivers = [] } = useQuery({
-    queryKey: ["drivers-all"],
+    queryKey: ["drivers"],
     queryFn: async () => {
       const response = await getJson<{ data: Array<{ driverId: string; name: string }> }>("/api/drivers");
       return response.data ?? [];
@@ -56,6 +56,7 @@ export default function AttendanceDashboard() {
       const response = await getJson<{ data: Array<Record<string, any>> }>(`/api/attendance?date=${dateStr}`);
       return response.data ?? [];
     },
+    placeholderData: (previousData) => previousData,
   });
 
   const filtered = useMemo(() => {

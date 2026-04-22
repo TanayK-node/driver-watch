@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { KPICard } from "@/components/KPICard";
 import { ArrowLeft, CalendarDays, Clock, UserCheck } from "lucide-react";
@@ -14,6 +14,7 @@ export default function DriverAttendanceDetail() {
   const { driverId } = useParams<{ driverId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const backPath = ((location.state as { from?: string } | null)?.from) ?? "/attendance";
 
   const { data: driver } = useQuery({
@@ -23,6 +24,10 @@ export default function DriverAttendanceDetail() {
       return response.data;
     },
     enabled: !!driverId,
+    initialData: () => {
+      const drivers = queryClient.getQueryData<Array<Record<string, any>>>(["drivers"]);
+      return drivers?.find((d) => d.driverId === driverId);
+    },
   });
 
   const { data: records = [], isLoading } = useQuery({

@@ -106,7 +106,7 @@ export default function AttendanceUpload() {
   const queryClient = useQueryClient();
 
   const { data: drivers = [] } = useQuery({
-    queryKey: ["drivers-list"],
+    queryKey: ["drivers"],
     queryFn: async () => {
       const response = await getJson<{ data: Array<{ driverId: string; name: string }> }>("/api/drivers");
       return response.data ?? [];
@@ -325,7 +325,7 @@ export default function AttendanceUpload() {
     }
     setCreatingDriver(false);
     toast.success(`Driver ${newDriver.name} added`);
-    await queryClient.invalidateQueries({ queryKey: ["drivers-list"] });
+    await queryClient.invalidateQueries({ queryKey: ["drivers"] });
     // Auto-map the row that triggered this
     if (addDriverForRowIndex !== null) {
       const idx = addDriverForRowIndex;

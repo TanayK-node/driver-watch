@@ -1,9 +1,11 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { getJson } from "@/lib/api";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -20,7 +22,42 @@ import LiveMap from "./pages/LiveMap";
 import WIPPage from "./pages/WIPPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+function DataWarmup() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    void queryClient.prefetchQuery({
+      queryKey: ["drivers"],
+      queryFn: async () => {
+        const response = await getJson<{ data: Array<Record<string, any>> }>("/api/drivers");
+        return response.data ?? [];
+      },
+    });
+
+    void queryClient.prefetchQuery({
+      queryKey: ["attendance", today],
+      queryFn: async () => {
+        const response = await getJson<{ data: Array<Record<string, any>> }>(`/api/attendance?date=${today}`);
+        return response.data ?? [];
+      },
+    });
+  }, [queryClient]);
+
+  return null;
+}
 
 const Protected = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>{children}</ProtectedRoute>
@@ -28,6 +65,7 @@ const Protected = ({ children }: { children: React.ReactNode }) => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <DataWarmup />
     <TooltipProvider>
       <Toaster />
       <Sonner />

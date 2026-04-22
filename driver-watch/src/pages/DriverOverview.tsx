@@ -38,7 +38,6 @@ export default function DriverOverview() {
     setIsSyncing(true);
     try {
       await queryClient.invalidateQueries({ queryKey: ["drivers"] });
-      await queryClient.invalidateQueries({ queryKey: ["drivers-all"] });
       toast({
         title: "Drivers Refreshed",
         description: "MongoDB data refreshed successfully.",
