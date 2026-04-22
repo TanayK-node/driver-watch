@@ -79,7 +79,7 @@ Rules:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-2.0-flash",
           response_format: { type: "json_object" }, // Forces strict JSON output
           messages: [
             { role: "system", content: systemPrompt },

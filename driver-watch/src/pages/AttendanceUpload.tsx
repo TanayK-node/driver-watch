@@ -229,6 +229,7 @@ export default function AttendanceUpload() {
 
       const response = await postJson<{ rows?: any[] }>("/api/attendance/extract-from-image", {
         imageBase64: base64,
+        mimeType: file.type || "image/jpeg",
         drivers: drivers.map((d) => ({ driverId: d.driverId, name: d.name })),
       });
 

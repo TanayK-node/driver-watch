@@ -51,6 +51,8 @@ interface Driver {
     vehicleColor: string | null;
 }
 
+type DriversApiResponse = Driver[] | { data?: Driver[] };
+
 const normalizeKey = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
 
 const isCssColor = (value: string) =>
@@ -87,11 +89,12 @@ export default function LiveDashboard() {
         try {
             setError(null);
             const [driversRes, countRes] = await Promise.all([
-                getJson<{ data: Driver[] }>('/api/ride-request/drivers/name/locations/iitb'),
+                getJson<DriversApiResponse>('/api/ride-request/drivers/name/locations/iitb'),
                 getJson<{ count: number }>('/api/drivers/count'),
             ]);
 
-            setDrivers(driversRes.data ?? []);
+            const liveDrivers = Array.isArray(driversRes) ? driversRes : (driversRes.data ?? []);
+            setDrivers(liveDrivers);
             setTotalRegistered(countRes.count ?? 0);
         } catch (err) {
             console.error("API Error:", err);

@@ -1,8 +1,9 @@
 # main.py
+from itertools import count
 import os
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 import geopandas as gpd
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -35,13 +36,13 @@ if mongo_uri:
 
         mongo_drivers_col = mongo_db["drivers"]
         mongo_attendance_col = mongo_db["attendance"]
-        mongo_location_col = mongo_db["driverlocationstatuses"]
-        mongo_route_col = mongo_db["vehiclerouteiitbs"]
 
         # Keep legacy collections available for one-time migration from the old source database.
         legacy_db = mongo_client["tutemprod"]
         legacy_users_col = legacy_db["users"]
         legacy_vehicles_col = legacy_db["drivervehicledetails"]
+        mongo_route_col = legacy_db["vehiclerouteiitbs"]
+        mongo_location_col = legacy_db["driverlocationstatuses"]
     except Exception as e:
         print(f"Failed to connect to MongoDB: {e}")
         mongo_client = None
@@ -175,6 +176,29 @@ def normalize_attendance_date(value):
     if " " in value_str:
         return value_str.split(" ", 1)[0]
     return value_str
+
+
+def parse_mongo_datetime(value):
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    value_str = str(value).strip()
+    if not value_str:
+        return None
+
+    try:
+        parsed = datetime.fromisoformat(value_str.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 @app.post("/api/sync-drivers")
@@ -395,16 +419,21 @@ async def upsert_attendance_bulk(payload: dict):
 @app.post("/api/attendance/extract-from-image")
 async def extract_attendance_from_image(payload: dict):
     image_base64 = payload.get("imageBase64")
+    mime_type = payload.get("mimeType") or "image/jpeg"
     drivers = payload.get("drivers") or []
 
     if not image_base64:
         raise HTTPException(status_code=400, detail="imageBase64 is required")
 
-    gateway_api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("LOVABLE_API_KEY")
-    if gateway_api_key and gateway_api_key.upper().startswith("PASTE_YOUR_"):
-        gateway_api_key = None
+    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    lovable_api_key = os.environ.get("LOVABLE_API_KEY")
 
-    if not gateway_api_key:
+    if gemini_api_key and gemini_api_key.upper().startswith("PASTE_YOUR_"):
+        gemini_api_key = None
+    if lovable_api_key and lovable_api_key.upper().startswith("PASTE_YOUR_"):
+        lovable_api_key = None
+
+    if not gemini_api_key and not lovable_api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY (or LOVABLE_API_KEY) is not configured")
 
     unique_driver_names = sorted(
@@ -457,51 +486,110 @@ Rules:
 - Return ONLY valid JSON.
 - If no attendance rows are readable, return {{"rows": []}}."""
 
-    request_body = {
-        "model": "google/gemini-2.5-flash",
-        "response_format": {"type": "json_object"},
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
-                    },
-                    {
-                        "type": "text",
-                        "text": "Extract attendance and fuzzy-match every name directly to the provided driver list.",
-                    },
-                ],
+    content = ""
+
+    # Preferred path: call Gemini directly when GEMINI_API_KEY is set.
+    if gemini_api_key:
+        gemini_body = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": system_prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": image_base64,
+                            }
+                        },
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "responseMimeType": "application/json",
             },
-        ],
-    }
+        }
 
-    req = urllib_request.Request(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
-        data=json.dumps(request_body).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {gateway_api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
+        gemini_req = urllib_request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}",
+            data=json.dumps(gemini_body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
 
-    try:
-        with urllib_request.urlopen(req, timeout=90) as response:
-            response_payload = json.loads(response.read().decode("utf-8"))
-    except urllib_error.HTTPError as error:
-        error_body = error.read().decode("utf-8", errors="ignore")
-        if error.code == 429:
-            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again in a moment.")
-        if error.code == 402:
-            raise HTTPException(status_code=402, detail="AI credits exhausted. Please add funds in Settings > Workspace > Usage.")
-        raise HTTPException(status_code=500, detail=error_body or "AI extraction failed")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        try:
+            with urllib_request.urlopen(gemini_req, timeout=90) as response:
+                gemini_payload = json.loads(response.read().decode("utf-8"))
+            content = (
+                gemini_payload.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+            )
+        except urllib_error.HTTPError as error:
+            error_body = error.read().decode("utf-8", errors="ignore")
+            try:
+                parsed_error = json.loads(error_body) if error_body else {}
+                message = parsed_error.get("error", {}).get("message")
+            except Exception:
+                parsed_error = {}
+                message = None
 
-    content = response_payload.get("choices", [{}])[0].get("message", {}).get("content", "")
+            if error.code == 429:
+                raise HTTPException(status_code=429, detail=message or "Gemini quota exceeded. Please check billing/limits and retry.")
+
+            raise HTTPException(status_code=500, detail=message or error_body or "Gemini extraction failed")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Fallback path for Lovable gateway if GEMINI_API_KEY is unavailable.
+    elif lovable_api_key:
+        request_body = {
+            "model": "google/gemini-2.5-flash",
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:{mime_type};base64,{image_base64}"},
+                        },
+                        {
+                            "type": "text",
+                            "text": "Extract attendance and fuzzy-match every name directly to the provided driver list.",
+                        },
+                    ],
+                },
+            ],
+        }
+
+        req = urllib_request.Request(
+            "https://ai.gateway.lovable.dev/v1/chat/completions",
+            data=json.dumps(request_body).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {lovable_api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            with urllib_request.urlopen(req, timeout=90) as response:
+                response_payload = json.loads(response.read().decode("utf-8"))
+            content = response_payload.get("choices", [{}])[0].get("message", {}).get("content", "")
+        except urllib_error.HTTPError as error:
+            error_body = error.read().decode("utf-8", errors="ignore")
+            if error.code == 429:
+                raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again in a moment.")
+            if error.code == 402:
+                raise HTTPException(status_code=402, detail="AI credits exhausted. Please add funds in Settings > Workspace > Usage.")
+            if "1010" in (error_body or ""):
+                raise HTTPException(status_code=500, detail="Lovable gateway rejected the key/token (code 1010). Use GEMINI_API_KEY for direct Gemini calls.")
+            raise HTTPException(status_code=500, detail=error_body or "AI extraction failed")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     json_str = content.replace("```json\n", "").replace("```\n", "").replace("```", "").strip()
 
     try:
@@ -512,7 +600,8 @@ Rules:
     return parsed
 
 
-mongo_route_col = mongo_db["vehiclerouteiitbs"]
+# mongo_route_col = mongo_db["vehiclerouteiitbs"]
+# mongo_location_col = mongo_db["driverlocationstatuses"]
 
 # IITB Campus Polygon for Ray-Casting
 IITB_POLYGON = [
@@ -544,50 +633,56 @@ async def get_live_iitb_drivers():
     if not is_mongo_ready(mongo_drivers_col, mongo_location_col, mongo_route_col):
         raise HTTPException(status_code=500, detail="MongoDB not connected")
 
-    time_threshold = datetime.utcnow() - timedelta(minutes=7)
+    time_threshold = datetime.now(timezone.utc) - timedelta(minutes=7)
+    count = mongo_location_col.count_documents({})
+    print("TOTAL DOCS IN COLLECTION:", count)
+    sample = mongo_location_col.find_one({"updatedAt": {"$exists": True}})
+    # if sample:
+        
+    #     print(f"DEBUG: DB Sample Time: {sample.get('updatedAt')} | Local Threshold: {time_threshold}")
 
-    active_locations = list(mongo_location_col.find({"updatedAt": {"$gte": time_threshold}}))
-    print(f"🔍 DEBUG: Found {len(active_locations)} locations updated in the last 7 minutes.")
+    active_locations = []
+    for location in mongo_location_col.find({}, {"driverId": 1, "location": 1, "updatedAt": 1}):
+        updated_at = parse_mongo_datetime(location.get("updatedAt"))
+        # print(f"Driver: {location.get('driverId')} | Raw: {location.get('updatedAt')} | Parsed: {updated_at} | Threshold: {time_threshold}")
+        if updated_at is None or updated_at < time_threshold:
+            continue
+        active_locations.append(location)
+    # print("NOW:", datetime.now(timezone.utc))
+    # print(f"🔍 DEBUG: Found {len(active_locations)} locations updated in the last 7 minutes.")
 
     merged_drivers = []
     
     for loc in active_locations:
         driver_id = loc.get("driverId")
-        if not driver_id: 
-            continue
+        if not driver_id: continue
             
-        # Safely convert coordinates to floats in case they are stored as strings
+        # Coordinate Parsing Logic (Keeping your robust try/except)
         lat, lng = 0.0, 0.0
         try:
             loc_obj = loc.get("location", {})
-            
-            # Check if it's your Array format: { type: "Point", coordinates: [Lat, Lng] }
             if isinstance(loc_obj, dict) and "coordinates" in loc_obj:
                 coords = loc_obj.get("coordinates", [0.0, 0.0])
-                lat = float(coords[0]) # 19.13...
-                lng = float(coords[1]) # 72.91...
-                
-            # Check if it's an object format: { latitude: X, longitude: Y }
+                lat, lng = float(coords[0]), float(coords[1])
             elif isinstance(loc_obj, dict) and "latitude" in loc_obj:
                 lat = float(loc_obj.get("latitude", 0))
                 lng = float(loc_obj.get("longitude", 0))
-                
         except (ValueError, TypeError, IndexError):
-            print(f"⚠️ Invalid coordinates format for driver {driver_id}")
             continue
 
         str_id = str(driver_id)
         try:
             obj_id = ObjectId(str_id)
-        except Exception:
-            print(f"⚠️ Invalid ObjectId format for {driver_id}")
+        except:
             continue
 
         driver_info = find_driver_document(str_id) or {}
-        route_info = mongo_route_col.find_one({"driverId": str_id}) or mongo_route_col.find_one({"driverId": obj_id}) or {}
+        route_info = mongo_route_col.find_one({"driverId": str_id}) or {}
         
         org = driver_info.get("organization")
+        
         if org != "IITB Campus Auto":
+            # If this prints for everyone, your data isn't where you think it is!
             print(f"🚫 Dropped {driver_id}: Wrong organization ('{org}')")
             continue
         
@@ -599,7 +694,7 @@ async def get_live_iitb_drivers():
             "longitude": lng,
             "vehicleRegistrationNo": driver_info.get("vehicleRegistrationNo", "N/A"),
             "vehicleColor": driver_info.get("vehicleColor"),
-            "vehicleRoute": route_info.get("colorName", driver_info.get("vehicleRoute", "Not Assigned")),
+            "vehicleRoute": route_info.get("colorName", "Not Assigned"),
         })
         
     return sorted(merged_drivers, key=lambda x: x["name"])
