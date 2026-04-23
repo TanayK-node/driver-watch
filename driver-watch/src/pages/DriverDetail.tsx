@@ -3,8 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Phone, Car, CreditCard, Building2, Palette, Mail, MapPin, Star, CalendarDays, User } from "lucide-react";
+import { ArrowLeft, Phone, Car, CreditCard, Building2, Palette, Mail, MapPin, Star, CalendarDays, User, Route } from "lucide-react";
 import { getJson } from "@/lib/api";
 
 export default function DriverDetail() {
@@ -30,6 +32,22 @@ export default function DriverDetail() {
       return drivers?.find((d) => d.driverId === id);
     },
   });
+
+  const { data: trips = [], isLoading: tripsLoading } = useQuery({
+    queryKey: ["driver-trips", id],
+    queryFn: async () => {
+      const response = await getJson<{ data: Array<Record<string, any>> }>(`/api/drivers/${id}/trips?limit=100`);
+      return response.data ?? [];
+    },
+    enabled: !!id,
+  });
+
+  const tripStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    if (status === "completed") return "default";
+    if (status === "cancelled") return "destructive";
+    if (status === "ongoing") return "secondary";
+    return "outline";
+  };
 
   if (isLoading) {
     return (
@@ -154,6 +172,46 @@ export default function DriverDetail() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2"><Route className="h-4 w-4" />Trip History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {tripsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading trips...</p>
+            ) : trips.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No trip history found for this driver.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Origin</TableHead>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {trips.map((trip) => (
+                    <TableRow
+                      key={trip.tripId}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/tutem/trips/${trip.tripId}`)}
+                    >
+                      <TableCell className="font-medium">{trip.date ? new Date(trip.date).toLocaleDateString() : "-"}</TableCell>
+                      <TableCell>{trip.originName || "-"}</TableCell>
+                      <TableCell>{trip.destName || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={tripStatusBadgeVariant((trip.status || "unknown").toLowerCase())}>{trip.status || "unknown"}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

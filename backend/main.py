@@ -26,6 +26,7 @@ mongo_users_col = None
 mongo_attendance_col = None
 mongo_location_col = None
 mongo_route_col = None
+legacy_riderequests_col = None
 legacy_users_col = None
 legacy_vehicles_col = None
 user_sync_task = None
@@ -46,6 +47,7 @@ if mongo_uri:
         legacy_db = mongo_client["tutemprod"]
         legacy_users_col = legacy_db["users"]
         legacy_vehicles_col = legacy_db["drivervehicledetails"]
+        legacy_riderequests_col = legacy_db["riderequests"]
         mongo_route_col = legacy_db["vehiclerouteiitbs"]
         mongo_location_col = legacy_db["driverlocationstatuses"]
 
@@ -124,6 +126,25 @@ def get_driver_id_candidates(driver_id):
     return candidates
 
 
+def get_trip_id_candidates(value):
+    candidates = []
+    if value is None:
+        return candidates
+
+    value_str = str(value).strip()
+    if not value_str:
+        return candidates
+
+    candidates.append(value_str)
+
+    try:
+        candidates.append(ObjectId(value_str))
+    except Exception:
+        pass
+
+    return candidates
+
+
 def find_driver_document(driver_id):
     if mongo_drivers_col is None:
         return None
@@ -136,6 +157,65 @@ def find_driver_document(driver_id):
         if driver:
             return driver
     return None
+
+
+def normalize_trip_status(value):
+    status = str(value or "").strip().lower()
+
+    if status in {"endtrip", "completed", "complete", "done", "tripcompleted"}:
+        return "completed"
+    if status.startswith("cancel") or status in {"rejected", "failed"}:
+        return "cancelled"
+    if status in {"started", "ongoing", "active", "inprogress", "ontrip"}:
+        return "ongoing"
+    return status or "unknown"
+
+
+def get_trip_time_value(trip):
+    for key in ("completedAt", "cancelledAt", "updatedAt", "createdAt", "startedAt", "reachedDestinationAt", "onTripAt", "driverReachedAt"):
+        value = trip.get(key)
+        if value:
+            return value
+    return None
+
+
+def trip_list_item(trip):
+    return {
+        "tripId": str(trip.get("_id")),
+        "driverId": str(trip.get("driverId") or ""),
+        "userId": str(trip.get("userId") or ""),
+        "originName": trip.get("originName") or "",
+        "destName": trip.get("destName") or "",
+        "date": serialize_mongo_value(get_trip_time_value(trip)),
+        "status": normalize_trip_status(trip.get("status")),
+        "createdAt": serialize_mongo_value(trip.get("createdAt")),
+        "updatedAt": serialize_mongo_value(trip.get("updatedAt")),
+    }
+
+
+def fetch_trips_for_query(user_id=None, driver_id=None, status=None, limit=200):
+    if legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="Trip collection not configured.")
+
+    query_parts = []
+
+    if user_id is not None:
+        user_candidates = get_trip_id_candidates(user_id)
+        if user_candidates:
+            query_parts.append({"userId": {"$in": user_candidates}})
+
+    if driver_id is not None:
+        driver_candidates = get_trip_id_candidates(driver_id)
+        if driver_candidates:
+            query_parts.append({"driverId": {"$in": driver_candidates}})
+
+    if status:
+        query_parts.append({"status": str(status)})
+
+    query = {"$and": query_parts} if query_parts else {}
+
+    cursor = legacy_riderequests_col.find(query).sort("createdAt", -1).limit(max(1, min(int(limit or 200), 500)))
+    return [serialize_mongo_doc(trip) for trip in cursor]
 
 
 def upsert_attendance_record(record):
@@ -466,6 +546,52 @@ async def get_user(user_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching user: {str(e)}")
+
+
+@app.get("/api/users/{user_id}/trips")
+async def get_user_trips(user_id: str, limit: int = 100):
+    if mongo_client is None or legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        trips = fetch_trips_for_query(user_id=user_id, limit=limit)
+        return {"status": "success", "total_trips": len(trips), "data": [trip_list_item(trip) for trip in trips]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching user trips: {str(e)}")
+
+
+@app.get("/api/drivers/{driver_id}/trips")
+async def get_driver_trips(driver_id: str, limit: int = 100):
+    if mongo_client is None or legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        trips = fetch_trips_for_query(driver_id=driver_id, limit=limit)
+        return {"status": "success", "total_trips": len(trips), "data": [trip_list_item(trip) for trip in trips]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching driver trips: {str(e)}")
+
+
+@app.get("/api/trips/{trip_id}")
+async def get_trip(trip_id: str):
+    if mongo_client is None or legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        trip = legacy_riderequests_col.find_one({"_id": ObjectId(trip_id)})
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found.")
+        serialized = serialize_mongo_doc(trip)
+        serialized["statusNormalized"] = normalize_trip_status(serialized.get("status"))
+        return {"status": "success", "data": serialized}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching trip: {str(e)}")
 
 
 @app.get("/api/users/count")

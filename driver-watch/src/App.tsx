@@ -21,6 +21,7 @@ import TripAnalytics from "./pages/TripAnalytics";
 import LiveMap from "./pages/LiveMap";
 import UserDatabase from "./pages/UserDatabase";
 import UserDetail from "./pages/UserDetail";
+import TripDetail from "./pages/TripDetail";
 import WIPPage from "./pages/WIPPage";
 import NotFound from "./pages/NotFound";
 
@@ -104,6 +105,10 @@ const App = () => (
           <Route
             path="/tutem/user-database/:userId"
             element={<Protected><UserDetail /></Protected>}
+          />
+          <Route
+            path="/tutem/trips/:tripId"
+            element={<Protected><TripDetail /></Protected>}
           />
           <Route
             path="/tutem/daily-trips"
