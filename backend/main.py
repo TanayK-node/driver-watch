@@ -434,8 +434,38 @@ def get_trip_created_at(trip):
     return parse_mongo_datetime(trip.get("createdAt")) or parse_mongo_datetime(get_trip_time_value(trip))
 
 
+def build_iitb_driver_id_set():
+    if mongo_drivers_col is None:
+        raise HTTPException(status_code=500, detail="Driver collection not configured.")
+
+    eligible = set()
+    cursor = mongo_drivers_col.find(
+        {"organization": "IITB Campus Auto"},
+        {"driverId": 1},
+    )
+
+    for driver in cursor:
+        driver_id = str(driver.get("driverId") or "").strip()
+        if driver_id:
+            eligible.add(driver_id)
+
+        # Some rides may reference the Mongo _id instead of driverId.
+        mongo_id = str(driver.get("_id") or "").strip()
+        if mongo_id:
+            eligible.add(mongo_id)
+
+    return eligible
+
+
+def is_iitb_trip_driver(trip, eligible_driver_ids):
+    for candidate in get_trip_id_candidates(trip.get("driverId")):
+        if str(candidate).strip() in eligible_driver_ids:
+            return True
+    return False
+
+
 def build_trip_analysis_snapshot(reference_time=None):
-    if legacy_riderequests_col is None:
+    if legacy_riderequests_col is None or mongo_drivers_col is None:
         raise HTTPException(status_code=500, detail="Trip collection not configured.")
 
     now_utc = reference_time or datetime.now(timezone.utc)
@@ -451,6 +481,7 @@ def build_trip_analysis_snapshot(reference_time=None):
     overall_cancelled = 0
 
     projection = {
+        "driverId": 1,
         "status": 1,
         "createdAt": 1,
         "updatedAt": 1,
@@ -462,7 +493,12 @@ def build_trip_analysis_snapshot(reference_time=None):
         "reachedDestinationAt": 1,
     }
 
+    eligible_driver_ids = build_iitb_driver_id_set()
+
     for trip in legacy_riderequests_col.find({}, projection):
+        if not is_iitb_trip_driver(trip, eligible_driver_ids):
+            continue
+
         overall_total += 1
         normalized_status = normalize_trip_status(trip.get("status"))
 
@@ -486,7 +522,7 @@ def build_trip_analysis_snapshot(reference_time=None):
     return {
         "snapshotDate": today_date.isoformat(),
         "generatedAt": now_utc.isoformat(),
-        "source": "tutemprod.riderequests",
+        "source": "tutemprod.riderequests (IITB drivers only)",
         "daily": {
             "totalTripsToday": daily_total,
             "activeTrips": daily_active,
@@ -514,7 +550,7 @@ def save_trip_analysis_snapshot(snapshot):
 
 
 def build_today_trip_briefs(limit=200):
-    if legacy_riderequests_col is None:
+    if legacy_riderequests_col is None or mongo_drivers_col is None:
         raise HTTPException(status_code=500, detail="Trip collection not configured.")
 
     today_date = datetime.now(timezone.utc).date()
@@ -540,9 +576,13 @@ def build_today_trip_briefs(limit=200):
     }
 
     items = []
+    eligible_driver_ids = build_iitb_driver_id_set()
 
     cursor = legacy_riderequests_col.find({}, projection).sort("createdAt", -1).limit(5000)
     for trip in cursor:
+        if not is_iitb_trip_driver(trip, eligible_driver_ids):
+            continue
+
         created_at = get_trip_created_at(trip)
         if not created_at or created_at.date() != today_date:
             continue
@@ -697,7 +737,7 @@ def get_trip_point(trip, point_type):
 
 
 def build_trip_visual_analytics(days=120, limit=20000):
-    if legacy_riderequests_col is None:
+    if legacy_riderequests_col is None or mongo_drivers_col is None:
         raise HTTPException(status_code=500, detail="Trip collection not configured.")
 
     max_limit = max(500, min(int(limit or 20000), 50000))
@@ -707,6 +747,7 @@ def build_trip_visual_analytics(days=120, limit=20000):
     min_date = (now_utc - timedelta(days=days_window - 1)).date()
 
     projection = {
+        "driverId": 1,
         "status": 1,
         "createdAt": 1,
         "updatedAt": 1,
@@ -778,9 +819,13 @@ def build_trip_visual_analytics(days=120, limit=20000):
     route_points = defaultdict(lambda: {"originName": "", "destinationName": "", "count": 0, "originLat": 0.0, "originLng": 0.0, "destinationLat": 0.0, "destinationLng": 0.0})
 
     scanned = 0
+    eligible_driver_ids = build_iitb_driver_id_set()
 
     cursor = legacy_riderequests_col.find({}, projection).sort("createdAt", -1).limit(max_limit)
     for trip in cursor:
+        if not is_iitb_trip_driver(trip, eligible_driver_ids):
+            continue
+
         scanned += 1
         created_at = get_trip_created_at(trip)
         if not created_at:
