@@ -33,6 +33,9 @@ legacy_users_col = None
 legacy_vehicles_col = None
 user_sync_task = None
 users_last_sync_at = None
+user_trip_stats_cache = None
+user_trip_stats_cache_at = None
+USER_TRIP_STATS_CACHE_TTL_SECONDS = int(os.environ.get("USER_TRIP_STATS_CACHE_TTL_SECONDS", "120"))
 
 mongo_uri = os.environ.get("MONGO_URI")
 if mongo_uri:
@@ -53,6 +56,16 @@ if mongo_uri:
         legacy_riderequests_col = legacy_db["riderequests"]
         mongo_route_col = legacy_db["vehiclerouteiitbs"]
         mongo_location_col = legacy_db["driverlocationstatuses"]
+
+        try:
+            legacy_riderequests_col.create_index("userId")
+        except Exception:
+            pass
+
+        try:
+            legacy_riderequests_col.create_index([("userId", 1), ("status", 1)])
+        except Exception:
+            pass
 
         try:
             mongo_users_col.create_index("userId", unique=True)
@@ -217,10 +230,7 @@ def trip_list_item(trip):
     }
 
 
-def fetch_trips_for_query(user_id=None, driver_id=None, status=None, limit=200):
-    if legacy_riderequests_col is None:
-        raise HTTPException(status_code=500, detail="Trip collection not configured.")
-
+def build_trip_query(user_id=None, driver_id=None, status=None):
     query_parts = []
 
     if user_id is not None:
@@ -236,7 +246,102 @@ def fetch_trips_for_query(user_id=None, driver_id=None, status=None, limit=200):
     if status:
         query_parts.append({"status": str(status)})
 
-    query = {"$and": query_parts} if query_parts else {}
+    return {"$and": query_parts} if query_parts else {}
+
+
+def compute_trip_stats(query):
+    if legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="Trip collection not configured.")
+
+    total_trips = legacy_riderequests_col.count_documents(query)
+
+    completed_statuses = ["endtrip", "completed", "complete", "done", "tripcompleted"]
+    completed_query = dict(query)
+    completed_query["status"] = {"$in": completed_statuses}
+    successful_trips = legacy_riderequests_col.count_documents(completed_query)
+
+    return {
+        "totalTrips": total_trips,
+        "successfulTrips": successful_trips,
+        "cancelledOrIncompleteTrips": max(0, total_trips - successful_trips),
+    }
+
+
+def build_user_trip_stats_map():
+    if legacy_riderequests_col is None:
+        return {}
+
+    pipeline = [
+        {"$match": {"userId": {"$ne": None}}},
+        {
+            "$group": {
+                "_id": "$userId",
+                "totalTrips": {"$sum": 1},
+                "successfulTrips": {
+                    "$sum": {
+                        "$cond": [
+                            {
+                                "$in": [
+                                    {"$toLower": {"$trim": {"input": {"$ifNull": ["$status", ""]}}}},
+                                    ["endtrip", "completed", "complete", "done", "tripcompleted"],
+                                ]
+                            },
+                            1,
+                            0,
+                        ]
+                    }
+                },
+            }
+        },
+    ]
+
+    stats_map = {}
+    for row in legacy_riderequests_col.aggregate(pipeline, allowDiskUse=True):
+        user_id = str(row.get("_id") or "").strip()
+        if not user_id:
+            continue
+
+        total_trips = int(row.get("totalTrips") or 0)
+        successful_trips = int(row.get("successfulTrips") or 0)
+        stats_map[user_id] = {
+            "totalTrips": total_trips,
+            "successfulTrips": successful_trips,
+            "cancelledOrIncompleteTrips": max(0, total_trips - successful_trips),
+        }
+
+    return stats_map
+
+
+def get_cached_user_trip_stats_map(force_refresh=False):
+    global user_trip_stats_cache
+    global user_trip_stats_cache_at
+
+    if legacy_riderequests_col is None:
+        return {}
+
+    now_utc = datetime.now(timezone.utc)
+    cache_age_seconds = None
+    if user_trip_stats_cache_at is not None:
+        cache_age_seconds = (now_utc - user_trip_stats_cache_at).total_seconds()
+
+    if (
+        not force_refresh
+        and user_trip_stats_cache is not None
+        and cache_age_seconds is not None
+        and cache_age_seconds < USER_TRIP_STATS_CACHE_TTL_SECONDS
+    ):
+        return user_trip_stats_cache
+
+    user_trip_stats_cache = build_user_trip_stats_map()
+    user_trip_stats_cache_at = now_utc
+    return user_trip_stats_cache
+
+
+def fetch_trips_for_query(user_id=None, driver_id=None, status=None, limit=200):
+    if legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="Trip collection not configured.")
+
+    query = build_trip_query(user_id=user_id, driver_id=driver_id, status=status)
 
     cursor = legacy_riderequests_col.find(query).sort("createdAt", -1).limit(max(1, min(int(limit or 200), 500)))
     return [serialize_mongo_doc(trip) for trip in cursor]
@@ -787,6 +892,8 @@ def build_trip_visual_analytics(days=120, limit=20000):
 
 def sync_legacy_users_to_mongo_once() -> dict:
     global users_last_sync_at
+    global user_trip_stats_cache
+    global user_trip_stats_cache_at
 
     if mongo_client is None:
         raise HTTPException(status_code=500, detail="MongoDB connection not configured.")
@@ -847,6 +954,8 @@ def sync_legacy_users_to_mongo_once() -> dict:
         upserted += 1
 
     users_last_sync_at = datetime.now(timezone.utc)
+    user_trip_stats_cache = None
+    user_trip_stats_cache_at = None
 
     return {
         "status": "success",
@@ -1011,6 +1120,14 @@ async def list_users():
 
     try:
         users = [serialize_mongo_doc(user) for user in mongo_users_col.find({})]
+        trip_stats_map = get_cached_user_trip_stats_map()
+
+        for user in users:
+            user_id = str(user.get("userId") or "").strip()
+            stats = trip_stats_map.get(user_id, {"totalTrips": 0, "successfulTrips": 0, "cancelledOrIncompleteTrips": 0})
+            user.update(stats)
+
+        users.sort(key=lambda item: item.get("totalTrips", 0), reverse=True)
         return {"status": "success", "total_users": len(users), "data": users, "last_synced_at": users_last_sync_at.isoformat() if users_last_sync_at else None}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching users: {str(e)}")
@@ -1025,7 +1142,10 @@ async def get_user(user_id: str):
         user = mongo_users_col.find_one({"userId": user_id})
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
-        return {"status": "success", "data": serialize_mongo_doc(user)}
+        serialized_user = serialize_mongo_doc(user)
+        stats = compute_trip_stats(build_trip_query(user_id=user_id))
+        serialized_user.update(stats)
+        return {"status": "success", "data": serialized_user}
     except HTTPException:
         raise
     except Exception as e:
@@ -1038,8 +1158,15 @@ async def get_user_trips(user_id: str, limit: int = 100):
         raise HTTPException(status_code=500, detail="MongoDB connection not established.")
 
     try:
+        stats = compute_trip_stats(build_trip_query(user_id=user_id))
         trips = fetch_trips_for_query(user_id=user_id, limit=limit)
-        return {"status": "success", "total_trips": len(trips), "data": [trip_list_item(trip) for trip in trips]}
+        return {
+            "status": "success",
+            "total_trips": stats["totalTrips"],
+            "successful_trips": stats["successfulTrips"],
+            "cancelled_or_incomplete_trips": stats["cancelledOrIncompleteTrips"],
+            "data": [trip_list_item(trip) for trip in trips],
+        }
     except HTTPException:
         raise
     except Exception as e:

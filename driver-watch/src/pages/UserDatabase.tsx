@@ -28,6 +28,9 @@ type UserRow = {
   verificationStatus?: string | null;
   address?: string | null;
   deviceId?: string | null;
+  totalTrips?: number | null;
+  successfulTrips?: number | null;
+  cancelledOrIncompleteTrips?: number | null;
 };
 
 function formatDate(value?: string | null) {
@@ -87,19 +90,24 @@ export default function UserDatabase() {
 
   const genders = [...new Set(users.map((u) => (u.gender ?? "").trim()).filter(Boolean))];
 
-  const filtered = users.filter((u) => {
+  const filtered = useMemo(() => {
     const text = search.toLowerCase();
-    const status = normalizeStatus(u.verificationStatus);
-    const matchSearch =
-      (u.name?.toLowerCase() || "").includes(text) ||
-      (u.userId?.toLowerCase() || "").includes(text) ||
-      (u.email?.toLowerCase() || "").includes(text) ||
-      (u.phone?.toLowerCase() || "").includes(text);
-    const matchGender = genderFilter === "all" || (u.gender ?? "").toLowerCase() === genderFilter.toLowerCase();
-    const matchVerification = verificationFilter === "all" || status === verificationFilter;
 
-    return matchSearch && matchGender && matchVerification;
-  });
+    return users
+      .filter((u) => {
+        const status = normalizeStatus(u.verificationStatus);
+        const matchSearch =
+          (u.name?.toLowerCase() || "").includes(text) ||
+          (u.userId?.toLowerCase() || "").includes(text) ||
+          (u.email?.toLowerCase() || "").includes(text) ||
+          (u.phone?.toLowerCase() || "").includes(text);
+        const matchGender = genderFilter === "all" || (u.gender ?? "").toLowerCase() === genderFilter.toLowerCase();
+        const matchVerification = verificationFilter === "all" || status === verificationFilter;
+
+        return matchSearch && matchGender && matchVerification;
+      })
+      .sort((a, b) => (b.totalTrips ?? 0) - (a.totalTrips ?? 0));
+  }, [users, search, genderFilter, verificationFilter]);
 
   const verifiedCount = useMemo(
     () => users.filter((u) => ["verified", "approved", "active"].includes(normalizeStatus(u.verificationStatus))).length,
@@ -203,6 +211,7 @@ export default function UserDatabase() {
                     <TableHead>Gender</TableHead>
                     <TableHead>Registered</TableHead>
                     <TableHead>Verification</TableHead>
+                    <TableHead className="text-right">Trips</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -218,12 +227,13 @@ export default function UserDatabase() {
                         <TableCell>
                           <Badge variant={statusBadgeVariant(status)}>{u.verificationStatus || "pending"}</Badge>
                         </TableCell>
+                        <TableCell className="text-right font-medium">{u.totalTrips ?? 0}</TableCell>
                       </TableRow>
                     );
                   })}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No users found.
                       </TableCell>
                     </TableRow>
@@ -265,6 +275,7 @@ export default function UserDatabase() {
                           <div className="pt-1">
                             <Badge variant={statusBadgeVariant(status)}>{u.verificationStatus || "pending"}</Badge>
                           </div>
+                          <div className="pt-0.5 text-xs text-muted-foreground">Trips: {u.totalTrips ?? 0}</div>
                         </div>
                       </CardContent>
                     </Card>

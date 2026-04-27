@@ -32,6 +32,13 @@ type TripSummary = {
   status?: string | null;
 };
 
+type UserTripsResponse = {
+  data: TripSummary[];
+  total_trips?: number;
+  successful_trips?: number;
+  cancelled_or_incomplete_trips?: number;
+};
+
 function formatDate(value?: string | null) {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -74,14 +81,19 @@ export default function UserDetail() {
     },
   });
 
-  const { data: trips = [], isLoading: tripsLoading } = useQuery({
+  const { data: tripsResponse, isLoading: tripsLoading } = useQuery({
     queryKey: ["user-trips", userId],
     queryFn: async () => {
-      const response = await getJson<{ data: TripSummary[] }>(`/api/users/${userId}/trips?limit=100`);
-      return response.data ?? [];
+      const response = await getJson<UserTripsResponse>(`/api/users/${userId}/trips?limit=100`);
+      return response;
     },
     enabled: !!userId,
   });
+
+  const trips = tripsResponse?.data ?? [];
+  const totalTrips = tripsResponse?.total_trips ?? trips.length;
+  const successfulTrips = tripsResponse?.successful_trips ?? trips.filter((trip) => normalizeStatus(trip.status) === "completed").length;
+  const cancelledOrIncompleteTrips = tripsResponse?.cancelled_or_incomplete_trips ?? Math.max(0, totalTrips - successfulTrips);
 
   if (isLoading) {
     return (
@@ -189,6 +201,21 @@ export default function UserDetail() {
             <CardTitle className="text-base flex items-center gap-2"><Route className="h-4 w-4" />Trip History</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">Total Trips</p>
+                <p className="text-xl font-semibold">{totalTrips}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">Successful Trips</p>
+                <p className="text-xl font-semibold">{successfulTrips}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">Cancelled or Incomplete</p>
+                <p className="text-xl font-semibold">{cancelledOrIncompleteTrips}</p>
+              </div>
+            </div>
+
             {tripsLoading ? (
               <p className="text-sm text-muted-foreground">Loading trips...</p>
             ) : trips.length === 0 ? (
