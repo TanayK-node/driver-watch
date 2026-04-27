@@ -1,5 +1,6 @@
 # main.py
 from itertools import count
+from collections import defaultdict
 import os
 import io
 import json
@@ -24,6 +25,7 @@ mongo_db = None
 mongo_drivers_col = None
 mongo_users_col = None
 mongo_attendance_col = None
+mongo_trip_analysis_col = None
 mongo_location_col = None
 mongo_route_col = None
 legacy_riderequests_col = None
@@ -42,6 +44,7 @@ if mongo_uri:
         mongo_drivers_col = mongo_db["drivers"]
         mongo_users_col = mongo_db["users"]
         mongo_attendance_col = mongo_db["attendance"]
+        mongo_trip_analysis_col = mongo_db["trip_analysis"]
 
         # Keep legacy collections available for one-time migration from the old source database.
         legacy_db = mongo_client["tutemprod"]
@@ -55,6 +58,11 @@ if mongo_uri:
             mongo_users_col.create_index("userId", unique=True)
         except Exception:
             # Index creation failures should not block API startup.
+            pass
+
+        try:
+            mongo_trip_analysis_col.create_index("snapshotDate", unique=True)
+        except Exception:
             pass
     except Exception as e:
         print(f"Failed to connect to MongoDB: {e}")
@@ -156,6 +164,22 @@ def find_driver_document(driver_id):
         driver = mongo_drivers_col.find_one({"_id": candidate})
         if driver:
             return driver
+    return None
+
+
+def find_user_document(user_id):
+    if legacy_users_col is None:
+        return None
+
+    for candidate in get_trip_id_candidates(user_id):
+        if isinstance(candidate, ObjectId):
+            user = legacy_users_col.find_one({"_id": candidate})
+            if user:
+                return user
+
+        user = legacy_users_col.find_one({"userId": str(candidate)})
+        if user:
+            return user
     return None
 
 
@@ -299,6 +323,466 @@ def to_iso_string(value):
         return None
     value_str = str(value).strip()
     return value_str or None
+
+
+def get_trip_created_at(trip):
+    return parse_mongo_datetime(trip.get("createdAt")) or parse_mongo_datetime(get_trip_time_value(trip))
+
+
+def build_trip_analysis_snapshot(reference_time=None):
+    if legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="Trip collection not configured.")
+
+    now_utc = reference_time or datetime.now(timezone.utc)
+    today_date = now_utc.date()
+
+    daily_total = 0
+    daily_active = 0
+    daily_completed = 0
+    daily_cancelled_or_incompleted = 0
+
+    overall_total = 0
+    overall_successful = 0
+    overall_cancelled = 0
+
+    projection = {
+        "status": 1,
+        "createdAt": 1,
+        "updatedAt": 1,
+        "startedAt": 1,
+        "completedAt": 1,
+        "cancelledAt": 1,
+        "onTripAt": 1,
+        "driverReachedAt": 1,
+        "reachedDestinationAt": 1,
+    }
+
+    for trip in legacy_riderequests_col.find({}, projection):
+        overall_total += 1
+        normalized_status = normalize_trip_status(trip.get("status"))
+
+        if normalized_status == "completed":
+            overall_successful += 1
+        elif normalized_status == "cancelled":
+            overall_cancelled += 1
+
+        created_at = get_trip_created_at(trip)
+        if not created_at or created_at.date() != today_date:
+            continue
+
+        daily_total += 1
+        if normalized_status == "ongoing":
+            daily_active += 1
+        elif normalized_status == "completed":
+            daily_completed += 1
+        else:
+            daily_cancelled_or_incompleted += 1
+
+    return {
+        "snapshotDate": today_date.isoformat(),
+        "generatedAt": now_utc.isoformat(),
+        "source": "tutemprod.riderequests",
+        "daily": {
+            "totalTripsToday": daily_total,
+            "activeTrips": daily_active,
+            "completedTripsToday": daily_completed,
+            "cancelledOrIncompletedTripsToday": daily_cancelled_or_incompleted,
+        },
+        "past": {
+            "overallTrips": overall_total,
+            "successfulTrips": overall_successful,
+            "cancelledTrips": overall_cancelled,
+        },
+    }
+
+
+def save_trip_analysis_snapshot(snapshot):
+    if mongo_trip_analysis_col is None:
+        raise HTTPException(status_code=500, detail="Trip analysis collection not configured.")
+
+    mongo_trip_analysis_col.update_one(
+        {"snapshotDate": snapshot.get("snapshotDate")},
+        {"$set": snapshot},
+        upsert=True,
+    )
+    return snapshot
+
+
+def build_today_trip_briefs(limit=200):
+    if legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="Trip collection not configured.")
+
+    today_date = datetime.now(timezone.utc).date()
+    max_items = max(1, min(int(limit or 200), 500))
+
+    projection = {
+        "userId": 1,
+        "driverId": 1,
+        "userName": 1,
+        "driverName": 1,
+        "status": 1,
+        "originName": 1,
+        "destName": 1,
+        "destinationName": 1,
+        "createdAt": 1,
+        "updatedAt": 1,
+        "startedAt": 1,
+        "completedAt": 1,
+        "cancelledAt": 1,
+        "onTripAt": 1,
+        "driverReachedAt": 1,
+        "reachedDestinationAt": 1,
+    }
+
+    items = []
+
+    cursor = legacy_riderequests_col.find({}, projection).sort("createdAt", -1).limit(5000)
+    for trip in cursor:
+        created_at = get_trip_created_at(trip)
+        if not created_at or created_at.date() != today_date:
+            continue
+
+        status_normalized = normalize_trip_status(trip.get("status"))
+
+        user_name = str(trip.get("userName") or "").strip()
+        if not user_name:
+            user_doc = find_user_document(trip.get("userId"))
+            if user_doc:
+                user_name = str(user_doc.get("name") or "").strip()
+
+        driver_name = str(trip.get("driverName") or "").strip()
+        if not driver_name:
+            driver_doc = find_driver_document(trip.get("driverId"))
+            if driver_doc:
+                driver_name = str(driver_doc.get("name") or "").strip()
+
+        items.append(
+            {
+                "tripId": str(trip.get("_id") or ""),
+                "userId": str(trip.get("userId") or ""),
+                "userName": user_name or "Unknown User",
+                "driverId": str(trip.get("driverId") or ""),
+                "driverName": driver_name or "Unknown Driver",
+                "isCompleted": status_normalized == "completed",
+                "status": status_normalized,
+                "originName": str(trip.get("originName") or trip.get("origin") or ""),
+                "destinationName": str(trip.get("destName") or trip.get("destinationName") or trip.get("destination") or ""),
+                "createdAt": serialize_mongo_value(created_at),
+            }
+        )
+
+        if len(items) >= max_items:
+            break
+
+    return items
+
+
+def to_float(value):
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except Exception:
+        return None
+
+
+def parse_lat_lng(value):
+    if value is None:
+        return None
+
+    if isinstance(value, dict):
+        for lat_key, lng_key in (
+            ("lat", "lng"),
+            ("lat", "lon"),
+            ("lat", "longitude"),
+            ("latitude", "longitude"),
+            ("latitude", "lng"),
+            ("latitude", "lon"),
+        ):
+            lat = to_float(value.get(lat_key))
+            lng = to_float(value.get(lng_key))
+            if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
+                return lat, lng
+
+        coordinates = value.get("coordinates")
+        parsed = parse_lat_lng(coordinates)
+        if parsed:
+            return parsed
+
+        return None
+
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        first = to_float(value[0])
+        second = to_float(value[1])
+        if first is None or second is None:
+            return None
+
+        if -90 <= first <= 90 and -180 <= second <= 180:
+            return first, second
+
+        if -180 <= first <= 180 and -90 <= second <= 90:
+            return second, first
+
+        return None
+
+    if isinstance(value, str) and "," in value:
+        parts = [part.strip() for part in value.split(",")]
+        if len(parts) >= 2:
+            first = to_float(parts[0])
+            second = to_float(parts[1])
+            if first is not None and second is not None:
+                if -90 <= first <= 90 and -180 <= second <= 180:
+                    return first, second
+                if -180 <= first <= 180 and -90 <= second <= 90:
+                    return second, first
+
+    return None
+
+
+def get_trip_point(trip, point_type):
+    if point_type == "origin":
+        object_candidates = (
+            "originCoordinates",
+            "originCoordinate",
+            "originLocation",
+            "originPoint",
+            "pickupLocation",
+            "pickUpLocation",
+            "pickupCoordinates",
+            "sourceCoordinates",
+            "sourceLocation",
+        )
+        lat_candidates = ("originLat", "originLatitude", "pickupLat", "pickupLatitude", "sourceLat", "sourceLatitude")
+        lng_candidates = ("originLng", "originLon", "originLong", "originLongitude", "pickupLng", "pickupLon", "pickupLongitude", "sourceLng", "sourceLon", "sourceLongitude")
+    else:
+        object_candidates = (
+            "destCoordinates",
+            "destinationCoordinates",
+            "destinationCoordinate",
+            "destinationLocation",
+            "destLocation",
+            "dropLocation",
+            "dropCoordinates",
+        )
+        lat_candidates = ("destLat", "destLatitude", "destinationLat", "destinationLatitude", "dropLat", "dropLatitude")
+        lng_candidates = ("destLng", "destLon", "destLong", "destLongitude", "destinationLng", "destinationLon", "destinationLongitude", "dropLng", "dropLon", "dropLongitude")
+
+    for key in object_candidates:
+        parsed = parse_lat_lng(trip.get(key))
+        if parsed:
+            return parsed
+
+    lat_value = None
+    lng_value = None
+
+    for key in lat_candidates:
+        lat_value = to_float(trip.get(key))
+        if lat_value is not None:
+            break
+
+    for key in lng_candidates:
+        lng_value = to_float(trip.get(key))
+        if lng_value is not None:
+            break
+
+    if lat_value is not None and lng_value is not None and -90 <= lat_value <= 90 and -180 <= lng_value <= 180:
+        return lat_value, lng_value
+
+    return None
+
+
+def build_trip_visual_analytics(days=120, limit=20000):
+    if legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="Trip collection not configured.")
+
+    max_limit = max(500, min(int(limit or 20000), 50000))
+    days_window = max(7, min(int(days or 120), 730))
+
+    now_utc = datetime.now(timezone.utc)
+    min_date = (now_utc - timedelta(days=days_window - 1)).date()
+
+    projection = {
+        "status": 1,
+        "createdAt": 1,
+        "updatedAt": 1,
+        "startedAt": 1,
+        "completedAt": 1,
+        "cancelledAt": 1,
+        "onTripAt": 1,
+        "driverReachedAt": 1,
+        "reachedDestinationAt": 1,
+        "originName": 1,
+        "origin": 1,
+        "destName": 1,
+        "destinationName": 1,
+        "destination": 1,
+        "originCoordinates": 1,
+        "originCoordinate": 1,
+        "originLocation": 1,
+        "originPoint": 1,
+        "pickupLocation": 1,
+        "pickUpLocation": 1,
+        "pickupCoordinates": 1,
+        "sourceCoordinates": 1,
+        "sourceLocation": 1,
+        "destCoordinates": 1,
+        "destinationCoordinates": 1,
+        "destinationCoordinate": 1,
+        "destinationLocation": 1,
+        "destLocation": 1,
+        "dropLocation": 1,
+        "dropCoordinates": 1,
+        "originLat": 1,
+        "originLatitude": 1,
+        "originLng": 1,
+        "originLon": 1,
+        "originLong": 1,
+        "originLongitude": 1,
+        "pickupLat": 1,
+        "pickupLatitude": 1,
+        "pickupLng": 1,
+        "pickupLon": 1,
+        "pickupLongitude": 1,
+        "sourceLat": 1,
+        "sourceLatitude": 1,
+        "sourceLng": 1,
+        "sourceLon": 1,
+        "sourceLongitude": 1,
+        "destLat": 1,
+        "destLatitude": 1,
+        "destLng": 1,
+        "destLon": 1,
+        "destLong": 1,
+        "destLongitude": 1,
+        "destinationLat": 1,
+        "destinationLatitude": 1,
+        "destinationLng": 1,
+        "destinationLon": 1,
+        "destinationLongitude": 1,
+        "dropLat": 1,
+        "dropLatitude": 1,
+        "dropLng": 1,
+        "dropLon": 1,
+        "dropLongitude": 1,
+    }
+
+    daily_counts = defaultdict(lambda: {"trips": 0, "successful": 0, "cancelled": 0})
+    od_counts = defaultdict(int)
+    origin_points = defaultdict(lambda: {"name": "", "lat": 0.0, "lng": 0.0, "count": 0})
+    destination_points = defaultdict(lambda: {"name": "", "lat": 0.0, "lng": 0.0, "count": 0})
+    route_points = defaultdict(lambda: {"originName": "", "destinationName": "", "count": 0, "originLat": 0.0, "originLng": 0.0, "destinationLat": 0.0, "destinationLng": 0.0})
+
+    scanned = 0
+
+    cursor = legacy_riderequests_col.find({}, projection).sort("createdAt", -1).limit(max_limit)
+    for trip in cursor:
+        scanned += 1
+        created_at = get_trip_created_at(trip)
+        if not created_at:
+            continue
+
+        trip_date = created_at.date()
+        if trip_date < min_date:
+            continue
+
+        status_normalized = normalize_trip_status(trip.get("status"))
+        date_key = trip_date.isoformat()
+
+        daily_counts[date_key]["trips"] += 1
+        if status_normalized == "completed":
+            daily_counts[date_key]["successful"] += 1
+        elif status_normalized == "cancelled":
+            daily_counts[date_key]["cancelled"] += 1
+
+        origin_name = str(trip.get("originName") or trip.get("origin") or "Unknown Origin").strip() or "Unknown Origin"
+        destination_name = str(trip.get("destName") or trip.get("destinationName") or trip.get("destination") or "Unknown Destination").strip() or "Unknown Destination"
+        od_counts[(origin_name, destination_name)] += 1
+
+        origin_point = get_trip_point(trip, "origin")
+        if origin_point:
+            rounded = (round(origin_point[0], 4), round(origin_point[1], 4), origin_name)
+            origin_points[rounded]["name"] = origin_name
+            origin_points[rounded]["lat"] = round(origin_point[0], 4)
+            origin_points[rounded]["lng"] = round(origin_point[1], 4)
+            origin_points[rounded]["count"] += 1
+
+        destination_point = get_trip_point(trip, "destination")
+        if destination_point:
+            rounded = (round(destination_point[0], 4), round(destination_point[1], 4), destination_name)
+            destination_points[rounded]["name"] = destination_name
+            destination_points[rounded]["lat"] = round(destination_point[0], 4)
+            destination_points[rounded]["lng"] = round(destination_point[1], 4)
+            destination_points[rounded]["count"] += 1
+
+        if origin_point and destination_point:
+            route_key = (
+                origin_name,
+                destination_name,
+                round(origin_point[0], 4),
+                round(origin_point[1], 4),
+                round(destination_point[0], 4),
+                round(destination_point[1], 4),
+            )
+            route_points[route_key]["originName"] = origin_name
+            route_points[route_key]["destinationName"] = destination_name
+            route_points[route_key]["originLat"] = round(origin_point[0], 4)
+            route_points[route_key]["originLng"] = round(origin_point[1], 4)
+            route_points[route_key]["destinationLat"] = round(destination_point[0], 4)
+            route_points[route_key]["destinationLng"] = round(destination_point[1], 4)
+            route_points[route_key]["count"] += 1
+
+    ordered_dates = sorted(daily_counts.keys())
+    cumulative_trips = 0
+    cumulative_successful = 0
+    cumulative_cancelled = 0
+    trend = []
+
+    for date_key in ordered_dates:
+        day_info = daily_counts[date_key]
+        cumulative_trips += day_info["trips"]
+        cumulative_successful += day_info["successful"]
+        cumulative_cancelled += day_info["cancelled"]
+        trend.append(
+            {
+                "date": date_key,
+                "dailyTrips": day_info["trips"],
+                "dailySuccessfulTrips": day_info["successful"],
+                "dailyCancelledTrips": day_info["cancelled"],
+                "cumulativeTrips": cumulative_trips,
+                "cumulativeSuccessfulTrips": cumulative_successful,
+                "cumulativeCancelledTrips": cumulative_cancelled,
+            }
+        )
+
+    active_days = len(ordered_dates)
+    avg_trips_per_day = (cumulative_trips / active_days) if active_days > 0 else 0
+
+    od_matrix = [
+        {"originName": origin, "destinationName": destination, "count": count}
+        for (origin, destination), count in sorted(od_counts.items(), key=lambda item: item[1], reverse=True)
+    ][:40]
+
+    top_origin_points = sorted(origin_points.values(), key=lambda item: item["count"], reverse=True)[:120]
+    top_destination_points = sorted(destination_points.values(), key=lambda item: item["count"], reverse=True)[:120]
+    top_routes = sorted(route_points.values(), key=lambda item: item["count"], reverse=True)[:30]
+
+    return {
+        "generatedAt": now_utc.isoformat(),
+        "windowDays": days_window,
+        "scannedTrips": scanned,
+        "summary": {
+            "activeDays": active_days,
+            "avgTripsPerDay": round(avg_trips_per_day, 2),
+            "totalTripsInWindow": cumulative_trips,
+        },
+        "trend": trend,
+        "od": {
+            "matrix": od_matrix,
+            "origins": top_origin_points,
+            "destinations": top_destination_points,
+            "routes": top_routes,
+        },
+    }
 
 
 def sync_legacy_users_to_mongo_once() -> dict:
@@ -592,6 +1076,65 @@ async def get_trip(trip_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching trip: {str(e)}")
+
+
+@app.post("/api/tutem/trip-analysis/sync")
+async def sync_tutem_trip_analysis():
+    if mongo_client is None or legacy_riderequests_col is None or mongo_trip_analysis_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        snapshot = build_trip_analysis_snapshot()
+        saved = save_trip_analysis_snapshot(snapshot)
+        return {"status": "success", "data": serialize_mongo_doc(saved)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error syncing trip analysis: {str(e)}")
+
+
+@app.get("/api/tutem/trip-analysis/latest")
+async def get_latest_tutem_trip_analysis():
+    if mongo_client is None or mongo_trip_analysis_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        snapshot = mongo_trip_analysis_col.find_one({}, sort=[("snapshotDate", -1)])
+        if not snapshot:
+            raise HTTPException(status_code=404, detail="No trip analysis snapshot found.")
+        return {"status": "success", "data": serialize_mongo_doc(snapshot)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching latest trip analysis: {str(e)}")
+
+
+@app.get("/api/tutem/trip-analysis/today-trips")
+async def get_today_trip_briefs(limit: int = 200):
+    if mongo_client is None or legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        items = build_today_trip_briefs(limit=limit)
+        return {"status": "success", "count": len(items), "data": items}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching today's trip briefs: {str(e)}")
+
+
+@app.get("/api/tutem/trip-analysis/visuals")
+async def get_trip_analysis_visuals(days: int = 120, limit: int = 20000):
+    if mongo_client is None or legacy_riderequests_col is None:
+        raise HTTPException(status_code=500, detail="MongoDB connection not established.")
+
+    try:
+        visuals = build_trip_visual_analytics(days=days, limit=limit)
+        return {"status": "success", "data": visuals}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error building trip visuals: {str(e)}")
 
 
 @app.get("/api/users/count")

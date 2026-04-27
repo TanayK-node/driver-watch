@@ -22,6 +22,7 @@ import LiveMap from "./pages/LiveMap";
 import UserDatabase from "./pages/UserDatabase";
 import UserDetail from "./pages/UserDetail";
 import TripDetail from "./pages/TripDetail";
+import DailyTrips from "./pages/DailyTrips";
 import WIPPage from "./pages/WIPPage";
 import NotFound from "./pages/NotFound";
 
@@ -112,7 +113,7 @@ const App = () => (
           />
           <Route
             path="/tutem/daily-trips"
-            element={<Protected><WIPPage title="Daily Trips" description="The daily trips page is under development." /></Protected>}
+            element={<Protected><DailyTrips /></Protected>}
           />
           <Route
             path="/tutem/verification-status"
